@@ -1,0 +1,64 @@
+{
+  "device_info": {
+    "device_id": "TARGET-PHONE-X99",
+    "model": "iPhone 15 Pro",
+    "extraction_time": "2026-04-18T10:00:00Z"
+  },
+  "contacts": [
+    { "name": "Target Alpha", "phone": "+1234567890", "organization": "Local Target" },
+    { "name": "Swiss Banker", "phone": "+41791234567", "organization": "Offshore LLC" },
+    { "name": "Dubai Connect", "phone": "+971501234567", "email": "dubai@anonymous.net" },
+    { "name": "Unknown Burner", "phone": "+447890123456", "organization": "None" }
+  ],
+  "chats": [
+    { "from": "+1234567890", "to": "+41791234567", "message": "Did you establish the offshore account for the wire transfer?", "timestamp": "2026-04-16T10:05:00Z", "platform": "Signal" },
+    { "from": "+41791234567", "to": "+1234567890", "message": "Yes. Send it in bitcoin to avoid tracking: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", "timestamp": "2026-04-16T10:07:00Z", "platform": "Signal" },
+    { "from": "+41791234567", "to": "+1234567890", "message": "Use a tor browser and a burner phone just to be safe. We must hide all evidence of the shells.", "timestamp": "2026-04-16T10:08:00Z", "platform": "Signal" },
+    { "from": "+1234567890", "to": "+971501234567", "message": "The crypto is secured. Are you ready for the hawala drop tomorrow?", "timestamp": "2026-04-17T14:20:00Z", "platform": "WhatsApp" },
+    { "from": "+971501234567", "to": "+1234567890", "message": "I will send you the eth address for the remaining balance. 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD38", "timestamp": "2026-04-17T14:22:00Z", "platform": "WhatsApp" },
+    { "from": "+1234567890", "to": "+447890123456", "message": "Do we have the weapon secured for the meeting?", "timestamp": "2026-04-18T01:10:00Z", "platform": "iMessage" },
+    { "from": "+447890123456", "to": "+1234567890", "message": "It's in the designated location. Delete this message.", "timestamp": "2026-04-18T01:11:00Z", "platform": "iMessage" },
+    { "from": "+1234567890", "to": "+971501234567", "message": "I'm sending the drug shipment coordinates. Ensure you use VPN.", "timestamp": "2026-04-18T05:00:00Z", "platform": "WhatsApp" }
+  ],
+  "calls": [
+    { "from": "+1234567890", "to": "+41791234567", "duration": 480, "direction": "outgoing", "timestamp": "2026-04-16T09:30:00Z" },
+    { "from": "+971501234567", "to": "+1234567890", "duration": 120, "direction": "incoming", "timestamp": "2026-04-17T14:00:00Z" },
+    { "from": "+447890123456", "to": "+1234567890", "duration": 35, "direction": "missed", "timestamp": "2026-04-18T01:05:00Z" }
+  ],
+  "images": [
+    { 
+        "filename": "EVIDENCE_CONFISCATED_CASH_01.jpg", 
+        "device": "Nikon D3500 (Crime Scene Unit)", 
+        "timestamp": "2026-04-16T11:00:00Z", 
+        "lat": 47.3769, 
+        "lng": 8.5417,
+        "url": "https://images.unsplash.com/photo-1616422285623-13ff0162193c"
+    },
+    { 
+        "filename": "drop_location_surveillance.png", 
+        "device": "CCTV-CAM-04", 
+        "timestamp": "2026-04-18T02:00:00Z", 
+        "lat": 25.2048, 
+        "lng": 55.2708,
+        "url": "https://images.unsplash.com/photo-1555848962-6e79363ec58f"
+    },
+    { 
+        "filename": "crypto_wallet_qr_scan.jpg", 
+        "device": "iPhone 15 Pro", 
+        "timestamp": "2026-04-17T15:00:00Z",
+        "url": "https://images.unsplash.com/photo-1621416894569-0f39ed31d247"
+    },
+    { 
+        "filename": "suspect_burner_phone.jpg", 
+        "device": "iPhone 15 Pro", 
+        "timestamp": "2026-04-17T18:30:00Z",
+        "url": "https://images.unsplash.com/photo-1520695287272-b7f8af46db4e"
+    },
+    { 
+        "filename": "bank_wire_transfer_receipt.jpg", 
+        "device": "iPhone 15 Pro", 
+        "timestamp": "2026-04-16T10:15:00Z",
+        "url": "https://images.unsplash.com/photo-1607863680198-23d4b2565df0"
+    }
+  ]
+}

@@ -25,10 +25,22 @@ import CasePage from "@/pages/CasePage";
 import NotFound from "./pages/NotFound";
 import ForensicsCompass from "./pages/ForensicsCompass";
 
-const queryClient = new QueryClient();
+// Singleton — must live outside the component so it's never recreated on re-render
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
 
 const App = () => {
-  const [user, setUser] = useState(null); // { role: 'officer' | 'admin', id: string }
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem("forensix_user");
+    return saved ? JSON.parse(saved) : null;
+  }); // { role: 'officer' | 'admin', id: string }
+
 
   const handleLogin = (role: string, id: string) => {
     setUser({ role, id });
@@ -70,7 +82,11 @@ const App = () => {
                         )}
 
                         {/* Common routes for both roles */}
-                        <Route path="/" element={<UploadPage />} />
+                        {/* Default Landing: Dashboard */}
+                        <Route path="/" element={<DashboardPage />} />
+                        <Route path="/upload" element={<UploadPage />} />
+
+
                         <Route path="/forensics" element={<ForensicsCompass />} />
                         <Route path="/dashboard" element={<DashboardPage />} />
                         <Route path="/search" element={<SearchPage />} />

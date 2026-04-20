@@ -1,5 +1,4 @@
 import { ReactNode } from "react";
-import { motion } from "framer-motion";
 
 interface StatCardProps {
   title: string;
@@ -24,20 +23,18 @@ const iconVariantStyles = {
 
 export default function StatCard({ title, value, icon, variant = "default" }: StatCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
       className={`bg-card rounded-lg p-5 ${variantStyles[variant]}`}
     >
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono mb-2">{title}</p>
-          <p className="text-3xl font-bold font-mono">{value}</p>
+          <p className="text-2xl font-bold font-mono stat-value" data-value={value}>{value}</p>
         </div>
         <div className={`p-2 rounded-md bg-secondary ${iconVariantStyles[variant]}`}>
           {icon}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

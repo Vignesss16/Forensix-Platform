@@ -1,11 +1,12 @@
 /**
- * Forensix Local LLM Engine
- * --------------------------
- * Routes questions to Ollama (if running) or falls back to a smart,
- * human-like conversational engine. All data stays on this machine.
+ * CHANAKYA — Forensix Intelligence Engine
+ * -----------------------------------------
+ * Named after Acharya Chanakya (375–283 BCE), the ancient Indian spymaster,
+ * strategist, and author of Arthashastra — the world's first treatise on
+ * intelligence gathering, statecraft, and investigation.
  *
- * To enable full AI: Install Ollama (https://ollama.com) and run:
- *   ollama pull llama3.2:3b
+ * Routes questions to the AI API (if available) or falls back to a smart,
+ * rule-based forensic engine. All data stays on this machine.
  */
 
 import { InvestigationData, ChatRecord } from "./types";
@@ -13,28 +14,25 @@ import { InvestigationData, ChatRecord } from "./types";
 export type LLMStatus = "checking" | "connected" | "offline";
 
 let _status: LLMStatus = "checking";
-let _model = "llama3.2:3b";
 
-export function getOllamaStatus(): LLMStatus {
+export function getAIStatus(): LLMStatus {
   return _status;
 }
 
-/** Probe Ollama at localhost:11434. Call once on app start. */
-export async function checkOllamaStatus(): Promise<LLMStatus> {
+/** Check if the API endpoint is available */
+export async function checkAIStatus(): Promise<LLMStatus> {
   try {
-    const res = await fetch("http://localhost:11434/api/tags", {
-      signal: AbortSignal.timeout(2000),
+    // Just pinging the serverless function config options
+    const res = await fetch("/api/ai", {
+      method: 'OPTIONS',
+      signal: AbortSignal.timeout(3000),
     });
     if (res.ok) {
-      const data = await res.json();
-      if (data.models?.length > 0) {
-        _model = data.models[0].name;
-      }
       _status = "connected";
       return "connected";
     }
   } catch {
-    /* Ollama not running — expected when not installed */
+    /* Fallback if network is completely down */
   }
   _status = "offline";
   return "offline";
@@ -65,9 +63,17 @@ function buildSystemPrompt(data: InvestigationData): string {
     )
     .join("\n");
 
-  return `You are Forensix AI, a professional forensic investigation assistant for law enforcement officers. You analyse digital evidence from seized devices: chat messages, call logs, contacts, and image metadata.
+  return `You are CHANAKYA, the forensic intelligence engine for Forensix — named after Acharya Chanakya (375–283 BCE), the ancient Indian spymaster, strategist, and author of Arthashastra.
 
-Be professional but conversational. Speak clearly without unnecessary jargon. Reference specific names, numbers, and timestamps from the case when relevant. If the data doesn't contain the answer, say so honestly. Never roleplay as a fictional AI.
+You are serving a law enforcement officer. Your role is to analyse digital evidence from seized devices: chat messages, call logs, contacts, and image metadata.
+
+Speak with authority and precision. Use phrases like:
+- "My analysis reveals..."
+- "The evidence points to..."
+- "I have identified..."
+- "Upon examination of the data..."
+
+Be direct. Reference specific names, numbers, and timestamps. If the data doesn't contain the answer, say so clearly. Never roleplay as a different AI.
 
 === CASE DATA ===
 
@@ -85,12 +91,12 @@ MEDIA FILES: ${data.images.length} found, ${data.images.filter((i) => i.location
 
 =================
 
-Answer the officer's question based only on the case data above. Be concise and actionable.`;
+Answer the officer's question based only on the case data above. Be concise, precise, and actionable.`;
 }
 
-// ─── Ollama Streaming ─────────────────────────────────────────────────────────
+// ─── Groq API Streaming ───────────────────────────────────────────────────────
 
-export async function streamFromOllama(
+export async function streamFromAPI(
   question: string,
   history: Array<{ role: string; content: string }>,
   data: InvestigationData,
@@ -98,46 +104,50 @@ export async function streamFromOllama(
   onDone: () => void,
   signal?: AbortSignal
 ): Promise<void> {
-  const messages = [
-    { role: "system", content: buildSystemPrompt(data) },
-    ...history.slice(-12),
-    { role: "user", content: question },
-  ];
+  const res = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, history: history.slice(-12), caseContext: data }),
+    signal,
+  });
 
-  try {
-    const res = await fetch("http://localhost:11434/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: _model, messages, stream: true }),
-      signal,
-    });
+  if (!res.ok) {
+    throw new Error('API failed');
+  }
 
-    const reader = res.body?.getReader();
-    if (!reader) {
-      onDone();
-      return;
-    }
+  const reader = res.body?.getReader();
+  if (!reader) {
+    onDone();
+    return;
+  }
 
-    const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      for (const line of chunk.split("\n").filter(Boolean)) {
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value, { stream: true });
+
+    // SSE messages come as "data: { ... }\n\n"
+    const lines = chunk.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const dataStr = line.slice(6);
+        if (dataStr === "[DONE]") {
+          onDone();
+          return;
+        }
         try {
-          const j = JSON.parse(line);
-          if (j.message?.content) onToken(j.message.content);
-          if (j.done) {
-            onDone();
-            return;
+          const parsed = JSON.parse(dataStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            onToken(content);
           }
         } catch {
-          /* skip malformed */
+          /* malformed JSON chunk or incomplete */
         }
       }
     }
-  } catch {
-    /* aborted or connection lost */
   }
   onDone();
 }
@@ -145,13 +155,13 @@ export async function streamFromOllama(
 // ─── Smart Fallback Engine ────────────────────────────────────────────────────
 
 const OPENERS = [
-  "Based on the evidence in this case,",
-  "Looking at the case data,",
-  "From what I can see in the records,",
-  "I checked through the evidence and found that",
-  "Here's what the data shows:",
-  "Good question. Looking at this case,",
-  "Let me check that for you.",
+  "Upon examination of the evidence,",
+  "My analysis of this case reveals that",
+  "The data clearly indicates that",
+  "I have examined the records and found that",
+  "The evidence points to the following:",
+  "After thorough analysis,",
+  "The intelligence gathered shows that",
 ];
 
 function opener() {
@@ -181,45 +191,248 @@ function getCountry(num: string): string {
   return "🌍 International";
 }
 
-/** Smart rule-based fallback — understands natural language queries about case data */
+// ─── NLP Intent Scoring Engine ───────────────────────────────────────────────
+
+const STOPWORDS = new Set(["the", "is", "at", "which", "on", "and", "a", "an", "of", "to", "in", "for", "with", "about", "what", "how", "who", "when", "where", "why", "can", "you", "show", "me", "give", "tell", "please", "i", "want", "need", "do", "does"]);
+
+interface Intent {
+  id: string;
+  primary: string[]; // 3 points each
+  secondary: string[]; // 1 point each
+  threshold: number; // Minimum score to trigger
+}
+
+const INTENTS: Intent[] = [
+  {
+    id: "GREETING",
+    primary: ["hello", "hi", "hey", "namaste", "morning", "evening", "howdy"],
+    secondary: ["good"],
+    threshold: 3
+  },
+  {
+    id: "IDENTITY",
+    primary: ["introduce", "chanakya", "name", "yourself"],
+    secondary: ["who", "what", "are"],
+    threshold: 3
+  },
+  {
+    id: "HELP",
+    primary: ["help", "capabilities", "features", "commands", "guide"],
+    secondary: ["what", "do", "how", "can"],
+    threshold: 3
+  },
+  {
+    id: "CREATE_CASE",
+    primary: ["create", "make", "initialize", "new", "start"],
+    secondary: ["case", "dossier", "investigation", "file"],
+    threshold: 4 // Requires both a verb and a noun
+  },
+  {
+    id: "GO_DASHBOARD",
+    primary: ["dashboard", "home", "main"],
+    secondary: ["open", "go", "navigate"],
+    threshold: 3
+  },
+  {
+    id: "GO_CASES",
+    primary: ["cases", "dossiers", "management", "hub"],
+    secondary: ["open", "go", "navigate", "all"],
+    threshold: 3
+  },
+  {
+    id: "GO_UPLOAD",
+    primary: ["upload", "ufdr", "ingest", "file"],
+    secondary: ["data", "open", "go", "navigate", "put"],
+    threshold: 3
+  },
+  {
+    id: "SUMMARY",
+    primary: ["summary", "summarize", "summarise", "briefing", "overview", "report"],
+    secondary: ["picture", "happened", "full", "case", "overall"],
+    threshold: 3
+  },
+  {
+    id: "CRYPTO",
+    primary: ["crypto", "bitcoin", "btc", "wallet", "blockchain", "ethereum", "eth", "monero"],
+    secondary: ["usdt", "transaction", "transfer", "coin", "money", "funds"],
+    threshold: 3
+  },
+  {
+    id: "ALERTS",
+    primary: ["suspicious", "flagged", "threat", "danger", "illegal", "redflag", "alert"],
+    secondary: ["bad", "wrong", "hide", "evidence", "weapon", "drug", "find", "flags"],
+    threshold: 3
+  },
+  {
+    id: "CALLS",
+    primary: ["call", "calls", "phone", "dial", "ring", "duration"],
+    secondary: ["missed", "incoming", "outgoing", "longest"],
+    threshold: 3
+  },
+  {
+    id: "CONTACTS",
+    primary: ["contacts", "people", "suspects", "network", "relationship", "who"],
+    secondary: ["person", "individual", "talks", "with"],
+    threshold: 3
+  },
+  {
+    id: "FOREIGN",
+    primary: ["foreign", "international", "abroad", "overseas"],
+    secondary: ["outside", "country", "number"],
+    threshold: 3
+  },
+  {
+    id: "THANKS",
+    primary: ["thanks", "thank", "appreciate", "great", "good", "perfect", "shukriya", "dhanyavaad"],
+    secondary: ["work", "job"],
+    threshold: 3
+  },
+  {
+    id: "REACTION",
+    primary: ["crazy", "insane", "wow", "amazing", "cool", "ok", "hmm", "yes", "yeah", "sure", "wild"],
+    secondary: ["that", "is"],
+    threshold: 3
+  }
+];
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/gi, '') // remove punctuation
+    .split(/\s+/)
+    .filter(w => w.length > 0 && !STOPWORDS.has(w));
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function isMatch(token: string, keyword: string): boolean {
+  if (token === keyword) return true;
+  if (token.length >= 4 && (token.includes(keyword) || keyword.includes(token))) return true;
+  if (token.length >= 4 && keyword.length >= 4 && Math.abs(token.length - keyword.length) <= 2) {
+    if (levenshtein(token, keyword) <= 2) return true;
+  }
+  return false;
+}
+
+function scoreIntents(tokens: string[]): { id: string, score: number } | null {
+  let bestIntent: { id: string, score: number } | null = null;
+
+  for (const intent of INTENTS) {
+    let score = 0;
+
+    intent.primary.forEach(pk => {
+      if (tokens.some(t => isMatch(t, pk))) score += 3;
+    });
+
+    intent.secondary.forEach(sk => {
+      if (tokens.some(t => isMatch(t, sk))) score += 1;
+    });
+
+    if (score >= intent.threshold) {
+      if (!bestIntent || score > bestIntent.score) {
+        bestIntent = { id: intent.id, score };
+      }
+    }
+  }
+
+  return bestIntent;
+}
+
+/** Smart rule-based fallback — NLP powered engine */
 export function queryFallback(
   question: string,
-  data: InvestigationData
+  data: InvestigationData,
+  history: Array<{ role: string; content: string }> = []
 ): string {
   const q = question.toLowerCase().trim();
+  const tokens = tokenize(q);
+  const bestIntent = scoreIntents(tokens);
 
   // ── Greetings ──────────────────────────────────────────────────────────────
-  if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|howdy)\b/.test(q)) {
+  if (bestIntent?.id === "GREETING") {
     const count = data.chats.length + data.calls.length;
-    return `Hello! I'm **Forensix AI**, your investigation assistant.\n\nI've loaded this case and found **${data.chats.length} messages**, **${data.calls.length} call logs**, and **${data.contacts.length} contacts** — ${count} records in total.\n\nWhat would you like to investigate? I can help you find suspicious activity, trace communications, analyse patterns, or give you a full case summary.`;
+    return `Namaste. I am **CHANAKYA**, your forensic intelligence engine.\n\nI have analysed this case and found **${data.chats.length} messages**, **${data.calls.length} call logs**, and **${data.contacts.length} contacts** — **${count} records** in total.\n\n*"A person should not be too honest. Straight trees are cut first and honest people are screwed first."* — Chanakya\n\nWhat intelligence do you seek, Officer? I can identify suspects, trace communications, detect crypto activity, or deliver a full case briefing.`;
   }
 
   // ── Identity ───────────────────────────────────────────────────────────────
-  if (/who are you|what are you|your name|introduce yourself/.test(q)) {
-    return `I'm **Forensix AI**, a forensic investigation assistant built specifically for law enforcement officers.\n\nI analyse digital evidence — messages, calls, contacts, and media — entirely on your local machine. Your case data never leaves your system.\n\nI can help you:\n- 🔍 Find specific conversations or keywords\n- 🚨 Identify suspicious activity\n- 📊 Analyse communication patterns\n- 📍 Locate GPS data from images\n- 📋 Summarise the case\n\nWhat would you like to know?`;
+  if (bestIntent?.id === "IDENTITY") {
+    return `I am **CHANAKYA** — your forensic intelligence engine.\n\nI am named after **Acharya Chanakya (375–283 BCE)**, the ancient Indian spymaster, economist, and author of *Arthashastra* — history's first systematic treatise on intelligence gathering and statecraft.\n\nLike my namesake, I leave no stone unturned.\n\n**My capabilities:**\n- 🔍 Keyword and pattern search across all evidence\n- 🚨 Suspicious activity detection and threat scoring\n- 💰 Cryptocurrency wallet and blockchain activity tracing\n- 📡 Communication network mapping\n- 📍 GPS and geolocation analysis from media metadata\n- 📅 Chronological event timeline reconstruction\n- 👤 Contact and suspect profiling\n\n*"Before you start some work, always ask yourself three questions — Why am I doing it, What the results might be and Will I be successful."*\n\nState your query, Officer.`;
   }
 
   // ── Help / Capabilities ────────────────────────────────────────────────────
-  if (/\b(help|what can you|how do i|capabilities|features|commands)\b/.test(q)) {
-    return `Here's what I can help you with:\n\n**🔍 Search & Find**\n- "Find messages about Bitcoin"\n- "Show messages from [number]"\n- "Search for the word 'weapon'"\n\n**🚨 Suspicious Activity**\n- "Show me suspicious messages"\n- "Find any crypto wallets"\n- "What are the red flags in this case?"\n\n**👥 People & Contacts**\n- "Who are the main contacts?"\n- "Who does [number] communicate with most?"\n- "Show foreign/international numbers"\n\n**📅 Timeline & Patterns**\n- "Give me a timeline of events"\n- "When was there most activity?"\n- "Analyse communication patterns"\n\n**📋 Summary & Reports**\n- "Summarise this case"\n- "Give me a full overview"\n\nJust ask naturally — I'll understand!`;
+  if (bestIntent?.id === "HELP") {
+    return `**CHANAKYA — Operational Capabilities**\n\n**🔍 Search & Intelligence**\n- "Find messages about Bitcoin"\n- "Show messages from [number]"\n- "Search for the word 'weapon'"\n\n**🚨 Threat Detection**\n- "Show me suspicious messages"\n- "Find any crypto wallets"\n- "What are the red flags in this case?"\n\n**👤 Suspect Profiling**\n- "Who are the main contacts?"\n- "Who does [number] communicate with most?"\n- "Show foreign/international numbers"\n\n**📅 Timeline Reconstruction**\n- "Give me a timeline of events"\n- "When was there most activity?"\n- "Analyse communication patterns"\n\n**📋 Case Briefing**\n- "Summarise this case"\n- "Give me a full situation report"\n\nState your query in plain language — I will decipher it.`;
   }
 
   // ── Thanks ─────────────────────────────────────────────────────────────────
-  if (/\b(thanks|thank you|appreciate|great|good work|perfect)\b/.test(q)) {
+  if (bestIntent?.id === "THANKS") {
     const responses = [
-      "You're welcome! Let me know if you need to dig deeper into anything.",
-      "Happy to help. Is there anything else in this case you'd like to explore?",
-      "Of course! Feel free to ask anything else about the investigation.",
+      "The truth does not hide from those who seek it diligently. Is there more to uncover?",
+      "As Chanakya wrote: *'A man is great by deeds, not by birth.'* What else shall we investigate?",
+      "Intelligence well used bears fruit. Shall we dig deeper into this case?",
     ];
     return responses[Math.floor(Math.random() * responses.length)];
   }
 
+  // ── Reactions ──────────────────────────────────────────────────────────────
+  if (bestIntent?.id === "REACTION") {
+    let contextStr = "the facts";
+    if (history.length >= 1) {
+      // Find the last thing CHANAKYA said
+      const lastMsg = [...history].reverse().find(m => m.role === "assistant" || m.role === "system")?.content || "";
+      if (lastMsg) {
+        if (lastMsg.includes("crypto") || lastMsg.includes("wallet")) contextStr = "these financial anomalies";
+        else if (lastMsg.includes("suspicious") || lastMsg.includes("Priority")) contextStr = "these security threats";
+        else if (lastMsg.includes("international")) contextStr = "this cross-border activity";
+        else if (lastMsg.includes("messages") || lastMsg.includes("contacts")) contextStr = "these communication records";
+        else if (lastMsg.includes("call records")) contextStr = "these telephonic exchanges";
+      }
+    }
+
+    const responses = [
+      `Indeed. The digital footprint surrounding ${contextStr} leaves nothing to the imagination.`,
+      `As Chanakya says: *'Even if a snake is not poisonous, it should pretend to be venomous.'* We must stay vigilant regarding ${contextStr}.`,
+      `I agree it seems unusual. Shall we proceed to examine ${contextStr} deeper?`,
+      `The evidence speaks for itself. What specific intelligence would you like me to extract next regarding ${contextStr}?`,
+    ];
+    return responses[Math.floor(Math.random() * responses.length)];
+  }
+
+  // ── System Actions (CHANAKYA UI Control) ───────────────────────────────────
+  if (bestIntent?.id === "CREATE_CASE") {
+    return `[ACTION:CREATE_CASE]\n\nUnderstood, Officer. I can initialize a new Intelligence Dossier for your investigation. Proceed using the system action terminal above.`;
+  }
+
+  if (bestIntent?.id === "GO_DASHBOARD") {
+    return `[ACTION:GO_DASHBOARD]\n\nNavigating to the central intelligence dashboard.`;
+  }
+
+  if (bestIntent?.id === "GO_CASES") {
+    return `[ACTION:GO_CASES]\n\nRouting you to the central dossier management hub.`;
+  }
+
+  if (bestIntent?.id === "GO_UPLOAD") {
+    return `[ACTION:GO_UPLOAD]\n\nRouting you to the evidence ingestion terminal. You may upload your UFDR files there.`;
+  }
+
   // ── Case Summary ───────────────────────────────────────────────────────────
-  if (
-    /\b(summary|summarize|summarise|overview|brief|report|what happened|what's in|full picture)\b/.test(
-      q
-    )
-  ) {
+  if (bestIntent?.id === "SUMMARY") {
     const suspKeywords = [
       "bitcoin",
       "btc",
@@ -272,18 +485,14 @@ export function queryFallback(
       flagCount >= 5
         ? "🔴 **HIGH PRIORITY**"
         : flagCount >= 2
-        ? "🟡 **MEDIUM PRIORITY**"
-        : "🟢 **LOW RISK**";
+          ? "🟡 **MEDIUM PRIORITY**"
+          : "🟢 **LOW RISK**";
 
     return `## Case Summary\n\n**Evidence Overview**\n| Category | Count |\n|----------|-------|\n| Contacts | ${data.contacts.length} |\n| Messages | ${data.chats.length} |\n| Calls | ${data.calls.length} |\n| Media files | ${data.images.length} |\n| GPS-tagged images | ${data.images.filter((i) => i.location).length} |\n\n**Communication Platforms:** ${platforms || "N/A"}\n\n**Key Findings**\n- ${severity} — ${flagCount} suspicious messages flagged\n- 🌍 ${foreign.size} international number${foreign.size !== 1 ? "s" : ""} detected\n- 💰 ${walletCount} crypto wallet address${walletCount !== 1 ? "es" : ""} found\n\n**Recommendation:** ${flagCount >= 3 ? "Multiple suspicious communications detected. Prioritise reviewing flagged messages and tracing crypto addresses." : flagCount > 0 ? "Some suspicious content found. Review flagged messages before proceeding." : "No obvious red flags in keyword scan. Consider deeper manual review."}\n\nWould you like me to deep-dive into any specific area?`;
   }
 
   // ── Crypto / Bitcoin / Wallets ─────────────────────────────────────────────
-  if (
-    /\b(crypto|bitcoin|btc|wallet|blockchain|ethereum|eth|monero|usdt|tether|coin|transfer|transaction)\b/.test(
-      q
-    )
-  ) {
+  if (bestIntent?.id === "CRYPTO") {
     const keywords = [
       "bitcoin",
       "btc",
@@ -338,11 +547,7 @@ export function queryFallback(
   }
 
   // ── Suspicious Activity / Flags ────────────────────────────────────────────
-  if (
-    /\b(suspicious|flag|alert|danger|threat|illegal|concern|red flag|warrant|evidence)\b/.test(
-      q
-    )
-  ) {
+  if (bestIntent?.id === "ALERTS") {
     const suspKeywords = [
       "bitcoin",
       "btc",
@@ -555,11 +760,7 @@ export function queryFallback(
   }
 
   // ── Foreign / International Numbers ───────────────────────────────────────
-  if (
-    /\b(foreign|international|abroad|overseas|outside india|international number)\b/.test(
-      q
-    )
-  ) {
+  if (bestIntent?.id === "FOREIGN") {
     const foreign = new Set<string>();
     [...data.chats, ...data.calls].forEach((r) => {
       if (r.from.startsWith("+") && !r.from.startsWith("+91"))
@@ -584,11 +785,7 @@ export function queryFallback(
   }
 
   // ── Call Logs ──────────────────────────────────────────────────────────────
-  if (
-    /\b(call|calls|phone|dial|ring|duration|missed|incoming|outgoing)\b/.test(
-      q
-    )
-  ) {
+  if (bestIntent?.id === "CALLS") {
     if (data.calls.length === 0) return "There are no call logs in this case.";
 
     const sorted = [...data.calls].sort(
@@ -612,11 +809,7 @@ export function queryFallback(
   }
 
   // ── Contacts / Suspects ────────────────────────────────────────────────────
-  if (
-    /\b(contact|contacts|person|people|individual|suspect|who is|show me people)\b/.test(
-      q
-    )
-  ) {
+  if (bestIntent?.id === "CONTACTS") {
     if (data.contacts.length === 0)
       return "No contact records were found in the case data.";
 
@@ -659,8 +852,14 @@ export function queryFallback(
     return resp;
   }
 
-  // ── Complete Fallback ──────────────────────────────────────────────────────
-  return `I searched the case data but couldn't find anything specific to "${question}".\n\nHere are some things you can ask me:\n- **"Summarise this case"** — get an overview of all evidence\n- **"Show suspicious messages"** — see flagged communications\n- **"Find crypto wallet mentions"** — trace financial activity\n- **"Who are the main contacts?"** — see the contact network\n- **"Show the call logs"** — analyse phone call records\n- **"Give me a timeline"** — see events in order\n\nOr try rephrasing your question.`;
+  // ── Complete Fallback (Conversational) ─────────────────────────────────────
+  const fallbacks = [
+    `I am a forensic analytics engine, Officer, not a generic conversational assistant. I searched the active logs for "${question}" but found no matches. Let us return to the evidence.`,
+    `My dataset does not contain operational references to "${question}". Should we scan the crypto wallets or timeline instead?`,
+    `I do not have intelligence records matching "${question}" in this dossier. I suggest rephrasing or running a broader keyword scan.`,
+    `As Chanakya says: *'Test a servant while in the discharge of his duty.'* My duty is evidence analysis, and I cannot find "${question}" in these records. What next?`
+  ];
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
 // ─── Simulated Streaming (Offline Mode) ──────────────────────────────────────
@@ -676,9 +875,9 @@ export async function streamFallback(
   for (const token of tokens) {
     if (signal?.aborted) break;
     onToken(token);
-    // 18–40ms delay per word — feels natural, not too fast or slow
+    // Blazingly fast 2–6ms delay per word (simulates fast teleprinter)
     await new Promise((r) =>
-      setTimeout(r, 18 + Math.random() * 22)
+      setTimeout(r, 2 + Math.random() * 4)
     );
   }
   onDone();
@@ -688,7 +887,7 @@ export async function streamFallback(
 
 /**
  * Query the LLM with a question about the case.
- * - If Ollama is running → streams real AI response
+ * - Tries reaching /api/ai (Groq API)
  * - Otherwise → uses smart rule-based engine with streaming simulation
  */
 export async function queryLLM(
@@ -701,12 +900,12 @@ export async function queryLLM(
 ): Promise<void> {
   if (_status === "connected") {
     try {
-      await streamFromOllama(question, history, data, onToken, onDone, signal);
+      await streamFromAPI(question, history, data, onToken, onDone, signal);
       return;
     } catch {
       /* fall through to smart engine */
     }
   }
-  const answer = queryFallback(question, data);
+  const answer = queryFallback(question, data, history);
   await streamFallback(answer, onToken, onDone, signal);
 }

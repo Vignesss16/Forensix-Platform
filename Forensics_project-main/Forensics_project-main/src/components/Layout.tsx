@@ -1,6 +1,8 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Upload, LayoutDashboard, MessageSquare, Network, FileText, Shield, Image, Clock, Search, MapPin, FolderOpen, Sun, Moon, Keyboard, Bell, LogOut } from "lucide-react";
+import gsap from "@/lib/gsap-utils";
+import { useGSAP } from "@gsap/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +12,7 @@ import { useKeyboardShortcuts, useShortcut } from "@/contexts/KeyboardShortcutsC
 import { useNotifications } from "@/contexts/NotificationContext";
 
 const navItems = [
-  { to: "/", label: "Upload", icon: Upload },
+  { to: "/upload", label: "Upload", icon: Upload },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/search", label: "Search", icon: Search },
   { to: "/geospatial", label: "Maps", icon: MapPin },
@@ -32,10 +34,74 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const { registerShortcut } = useKeyboardShortcuts();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotification } = useNotifications();
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const logoPulseTweenRef = useRef<gsap.core.Tween | null>(null);
+  const bootRanRef = useRef(false);
+  
+  const { notifications, unreadCount, markAllAsRead, clearNotification, markAsRead } = useNotifications();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  const mainContentRef = useRef<HTMLDivElement>(null);
+
+  // Kill infinite GSAP tween on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      logoPulseTweenRef.current?.kill();
+    };
+  }, []);
+
+  // 1. Initial Boot Sequence (runs once on mount)
+  useGSAP(() => {
+    // Guard: only run boot sequence once even if this hook fires multiple times
+    if (bootRanRef.current) return;
+    bootRanRef.current = true;
+
+    const tl = gsap.timeline();
+    
+    // Sidebar slide & fade
+    tl.fromTo(sidebarRef.current, 
+      { x: -50, opacity: 0 },
+      { x: 0, opacity: 1, duration: 1, ease: "expo.out" }
+    )
+    .fromTo(".nav-link-item", 
+      { x: -20, opacity: 0 },
+      { x: 0, opacity: 1, duration: 0.5, stagger: 0.08, ease: "power2.out" },
+      "-=0.6"
+    )
+    .fromTo(".sidebar-footer", 
+      { y: 20, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.5, ease: "power2.out" },
+      "-=0.4"
+    );
+
+    // Initial content entrance
+    tl.fromTo(mainContentRef.current, 
+      { scale: 0.98, opacity: 0 }, 
+      { scale: 1, opacity: 1, duration: 0.8, ease: "power3.out" },
+      "-=0.2"
+    );
+
+    // Subtle logo pulse — stored in ref so we can kill it on unmount
+    logoPulseTweenRef.current = gsap.to(".logo-shield", {
+      filter: "drop-shadow(0 0 8px rgba(var(--primary-rgb), 0.6))",
+      duration: 2,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut"
+    });
+  }, []); // Run only once
+
+  // 2. Navigation-specific animations
+  useGSAP(() => {
+    // Subtle content refresh animation when navigating
+    if (mainContentRef.current) {
+      gsap.fromTo(mainContentRef.current, 
+        { opacity: 0.8, y: 5 }, 
+        { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }
+      );
+    }
+  }, { dependencies: [location.pathname] });
 
   // Register keyboard shortcuts
   useShortcut({
@@ -97,203 +163,97 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar */}
-      <aside className="w-64 shrink-0 bg-sidebar border-r border-border flex flex-col">
+      <aside ref={sidebarRef} className="w-64 shrink-0 bg-sidebar border-r border-border flex flex-col z-50">
         <div className="p-5 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <Shield className="h-7 w-7 text-primary" />
+              <Shield className="h-7 w-7 text-primary logo-shield" />
               <div>
                 <h1 className="text-base font-bold font-mono text-primary cyber-text-glow tracking-wide">FORENSIX</h1>
                 <p className="text-[10px] text-muted-foreground tracking-widest uppercase">Digital Forensics Platform</p>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground relative"
-                  >
-                    <Bell className="h-4 w-4" />
-                    {unreadCount > 0 && (
-                      <Badge
-                        variant="destructive"
-                        className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                      >
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </Badge>
-                    )}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <div className="flex items-center justify-between">
-                      <DialogTitle>Notifications</DialogTitle>
-                      {unreadCount > 0 && (
-                        <Button variant="outline" size="sm" onClick={markAllAsRead}>
-                          Mark all read
-                        </Button>
-                      )}
-                    </div>
-                  </DialogHeader>
-                  <ScrollArea className="h-96">
-                    <div className="space-y-2">
-                      {notifications.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-8">
-                          No notifications yet
-                        </p>
-                      ) : (
-                        notifications.map((notification) => (
-                          <div
-                            key={notification.id}
-                            className={`p-3 rounded-lg border ${
-                              !notification.read
-                                ? 'bg-primary/5 border-primary/20'
-                                : 'bg-secondary/50 border-border'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="text-sm font-medium">{notification.title}</h4>
-                                  {!notification.read && (
-                                    <div className="h-2 w-2 bg-primary rounded-full" />
-                                  )}
-                                </div>
-                                {notification.message && (
-                                  <p className="text-xs text-muted-foreground mb-2">
-                                    {notification.message}
-                                  </p>
-                                )}
-                                <p className="text-xs text-muted-foreground">
-                                  {notification.timestamp.toLocaleString()}
-                                </p>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => clearNotification(notification.id)}
-                                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                              >
-                                ×
-                              </Button>
-                            </div>
-                            {!notification.read && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => markAsRead(notification.id)}
-                                className="mt-2 h-6 text-xs"
-                              >
-                                Mark as read
-                              </Button>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
-                </DialogContent>
-              </Dialog>
-              <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  >
-                    <Keyboard className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Keyboard Shortcuts</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-2">
-                    {shortcuts.map((shortcut, index) => (
-                      <div key={index} className="flex items-center justify-between py-2">
-                        <span className="text-sm">{shortcut.description}</span>
-                        <kbd className="px-2 py-1 bg-secondary text-secondary-foreground rounded text-xs font-mono">
-                          {shortcut.keys}
-                        </kbd>
-                      </div>
-                    ))}
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              >
-                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-            </div>
           </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map(({ to, label, icon: Icon }) => {
             const active = location.pathname === to;
             return (
               <Link
                 key={to}
                 to={to}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all ${
+                className={`nav-link-item flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all group ${
                   active
                     ? "bg-primary/10 text-primary cyber-border cyber-glow"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className={`h-4 w-4 transition-transform ${active ? "scale-110" : "group-hover:scale-110"}`} />
                 {label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-border space-y-3">
-          {/* User Info */}
+        <div className="p-4 border-t border-border space-y-3 bg-sidebar/50 sidebar-footer">
+          <div className="flex items-center justify-between px-2 mb-2">
+            <div className="flex items-center gap-2">
+              <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground relative">
+                    <Bell className="h-4 w-4" />
+                    {unreadCount > 0 && (
+                      <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Notifications</DialogTitle></DialogHeader>
+                  <ScrollArea className="h-80"><div className="space-y-4 p-4">No new notifications</div></ScrollArea>
+                </DialogContent>
+              </Dialog>
+              <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 text-muted-foreground">
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+
           {user && (
-            <div className="bg-secondary/50 rounded-lg p-3 border border-border">
+            <div className="bg-secondary/30 rounded-lg p-3 border border-border/50">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-xs font-mono">
-                  <p className="text-muted-foreground">USER</p>
+                  <p className="text-[10px] text-muted-foreground uppercase opacity-70">OFFICER ID</p>
                   <p className="text-primary font-bold">{user.id}</p>
                 </div>
-                <Badge variant={user.role === 'admin' ? 'destructive' : 'default'}>
-                  {user.role.toUpperCase()}
+                <Badge variant="outline" className="text-[9px] border-primary/20 text-primary uppercase">
+                  {user.role}
                 </Badge>
               </div>
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                size="sm"
-                className="w-full text-xs"
-              >
-                <LogOut className="h-3 w-3 mr-2" />
+              <Button onClick={handleLogout} variant="ghost" size="sm" className="w-full text-[10px] h-8 hover:bg-destructive/10 hover:text-destructive">
+                <LogOut className="h-3.5 w-3.5 mr-2" />
                 LOGOUT
               </Button>
             </div>
           )}
 
-          {/* System Status */}
-          <div className="text-[10px] text-muted-foreground font-mono">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse-glow" />
+          <div className="text-[9px] text-muted-foreground font-mono opacity-50 px-2">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="h-1 w-1 rounded-full bg-accent animate-pulse" />
               SYSTEM ONLINE
             </div>
-            <div>v1.0.0 — Secure Mode</div>
+            <div>VER 1.0.0 — SECURE</div>
           </div>
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
+      {/* Main Container */}
+      <main ref={mainContentRef} className="flex-1 overflow-auto relative bg-[#020617] opacity-100">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,255,242,0.03),transparent_70%)] pointer-events-none" />
         {children}
       </main>
     </div>

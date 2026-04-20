@@ -19,7 +19,8 @@ export default function ReportPage() {
   // exhibits encrypted fragments.
   const decryptText = (s: any) => (typeof s === "string" ? s.replace(/&/g, "") : s);
 
-  if (!data) return <Navigate to="/" replace />;
+  // if (!data) return <Navigate to="/" replace />;
+
 
   const exportJSON = () => {
     const reportData = {
@@ -252,8 +253,27 @@ export default function ReportPage() {
     }
   };
 
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 text-center">
+        <div className="bg-card/50 p-12 rounded-2xl border border-dashed border-border max-w-md w-full">
+          <FileText className="h-16 w-16 text-primary/20 mx-auto mb-6" />
+          <h2 className="text-xl font-mono text-primary/80 mb-2">No active case selected</h2>
+          <p className="text-sm text-muted-foreground mb-8 text-pretty">
+            You must select an investigation case from the dashboard before a forensic report can be generated.
+          </p>
+          <Button onClick={() => window.location.href='/cases'} variant="outline" className="w-full font-mono">
+            Go to Case Management
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {/* ... rest of the existing return ... */}
+
       <div>
         <h1 className="text-2xl font-bold font-mono text-primary cyber-text-glow flex items-center gap-2">
           <FileText className="h-6 w-6" /> Generate Report

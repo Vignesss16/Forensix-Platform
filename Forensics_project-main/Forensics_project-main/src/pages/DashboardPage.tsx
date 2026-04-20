@@ -5,7 +5,8 @@ import {
   Wallet, Shield, Search, Calendar, MapPin, Brain, FileText,
   BarChart3, TrendingUp, Clock, ChevronRight, ExternalLink,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import gsap from "@/lib/gsap-utils";
+import { useGSAP } from "@gsap/react";
 import StatCard from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 // Fix leaflet icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -137,7 +138,7 @@ function FeatureCard({
   to?: string; icon: any; title: string; description: string; badge?: string;
 }) {
   const inner = (
-    <Card className="hover:shadow-md transition-all cursor-pointer cyber-border group hover:border-primary/30 h-full">
+    <Card className="hover:shadow-md transition-all cursor-pointer cyber-border group hover:border-primary/30 h-full feature-card opacity-0">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between text-sm">
           <span className="flex items-center gap-2">
@@ -163,25 +164,105 @@ function FeatureCard({
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { data, suspiciousItems, foreignNumbers, cryptoWallets } = useInvestigation();
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  if (!data) return <Navigate to="/" replace />;
+  useGSAP(() => {
+    const tl = gsap.timeline();
+    
+    // Smooth container entrance — fromTo so it never gets stuck at 0
+    tl.fromTo(containerRef.current, { opacity: 0 }, { opacity: 1, duration: 0.5 });
 
-  // Quick top stats
-  const highSeverity = suspiciousItems.filter((i) => i.severity === "high").length;
-  const platforms = [...new Set(data.chats.map((c) => c.platform).filter(Boolean))];
-  const geoCount = data.images.filter((i) => i.location).length;
+    // Hacker title reveal
+    tl.fromTo(".dashboard-title", 
+      { opacity: 0 }, 
+      { opacity: 1, duration: 0.3 }
+    ).to(".dashboard-title", {
+      duration: 1.2,
+      text: "INVESTIGATION DASHBOARD",
+      ease: "none"
+    });
+
+    // Staggered entrance for all cards
+    tl.from(".stat-card", {
+      y: 20,
+      opacity: 0,
+      duration: 0.6,
+      stagger: 0.08,
+      ease: "power2.out"
+    }, "-=0.8");
+
+    tl.from(".alert-card", {
+      scale: 0.95,
+      opacity: 0,
+      duration: 0.5,
+      stagger: 0.1,
+      ease: "back.out(1.7)"
+    }, "-=0.4");
+
+    tl.to(".feature-card", {
+      opacity: 1,
+      y: 0,
+      duration: 0.5,
+      stagger: 0.05,
+      ease: "power1.out"
+    }, "-=0.2");
+
+    // Map and Flagged messages section entrance
+    tl.from(".dashboard-grid-section", {
+      y: 30,
+      opacity: 0,
+      duration: 0.8,
+      ease: "power3.out"
+    }, "-=0.5");
+
+  }, { scope: containerRef, dependencies: [] }); // entrance runs ONCE only
+
+  // Separate effect for "Counting up" the stats — only re-runs when data changes
+  useGSAP(() => {
+    if (data) {
+      gsap.utils.toArray(".stat-value").forEach((el: any) => {
+        const endVal = parseInt(el.getAttribute("data-value") || "0");
+        if (isNaN(endVal) || endVal === 0) return;
+        const obj = { val: 0 };
+        gsap.to(obj, {
+          val: endVal,
+          duration: 1.5,
+          ease: "power2.out",
+          delay: 0.3, // let entrance animate finish first
+          onUpdate: () => {
+            el.textContent = Math.floor(obj.val).toLocaleString();
+          }
+        });
+      });
+    }
+  }, { scope: containerRef, dependencies: [data] });
+
+  // ── Derived values — memoized so they don't recompute on unrelated renders
+  const highSeverity = useMemo(
+    () => (suspiciousItems ? suspiciousItems.filter((i) => i.severity === "high").length : 0),
+    [suspiciousItems]
+  );
+  const platforms = useMemo(
+    () => (data ? [...new Set(data.chats.map((c) => c.platform).filter(Boolean))] : []),
+    [data]
+  );
+  const geoCount = useMemo(
+    () => (data ? data.images.filter((i) => i.location).length : 0),
+    [data]
+  );
 
   return (
-    <div className="p-5 space-y-6">
+    <div className="p-5 space-y-6 dashboard-container" ref={containerRef}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold font-mono text-primary cyber-text-glow">
+          <h1 className="text-xl font-bold font-mono text-primary cyber-text-glow dashboard-title">
             Investigation Dashboard
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {data.rawRecords.length} forensic records analysed
+            {data ? `${data.rawRecords.length} forensic records analysed` : "Waiting for forensic data upload..."}
           </p>
+
         </div>
         <div className="flex items-center gap-2">
           {highSeverity > 0 && (
@@ -197,31 +278,25 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Primary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard title="Total Chats" value={data.chats.length} icon={<MessageSquare className="h-5 w-5" />} />
-        <StatCard title="Call Logs" value={data.calls.length} icon={<Phone className="h-5 w-5" />} />
-        <StatCard title="Contacts" value={data.contacts.length} icon={<Users className="h-5 w-5" />} />
-        <StatCard title="Images" value={data.images.length} icon={<Image className="h-5 w-5" />} />
+        <div className="stat-card"><StatCard title="Total Chats" value={data?.chats.length ?? 0} icon={<MessageSquare className="h-5 w-5" />} /></div>
+        <div className="stat-card"><StatCard title="Call Logs" value={data?.calls.length ?? 0} icon={<Phone className="h-5 w-5" />} /></div>
+        <div className="stat-card"><StatCard title="Contacts" value={data?.contacts.length ?? 0} icon={<Users className="h-5 w-5" />} /></div>
+        <div className="stat-card"><StatCard title="Images" value={data?.images.length ?? 0} icon={<Image className="h-5 w-5" />} /></div>
       </div>
 
-      {/* Alert Stats */}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StatCard title="Suspicious Flags" value={suspiciousItems.length} icon={<AlertTriangle className="h-5 w-5" />} variant="danger" />
-        <StatCard title="Foreign Numbers" value={foreignNumbers.length} icon={<Globe className="h-5 w-5" />} variant="warning" />
-        <StatCard title="Crypto Wallets" value={cryptoWallets.length} icon={<Wallet className="h-5 w-5" />} variant="accent" />
+        <div className="alert-card"><StatCard title="Suspicious Flags" value={suspiciousItems.length} icon={<AlertTriangle className="h-5 w-5" />} variant="danger" /></div>
+        <div className="alert-card"><StatCard title="Foreign Numbers" value={foreignNumbers.length} icon={<Globe className="h-5 w-5" />} variant="warning" /></div>
+        <div className="alert-card"><StatCard title="Crypto Wallets" value={cryptoWallets.length} icon={<Wallet className="h-5 w-5" />} variant="accent" /></div>
       </div>
 
       {/* Map + Suspicious Items Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 dashboard-grid-section">
 
         {/* ── Case Activity Map ──────────────────────────────────────────── */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="lg:col-span-3 bg-card rounded-xl cyber-border overflow-hidden flex flex-col"
-        >
+        <div className="lg:col-span-3 bg-card rounded-xl cyber-border overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 rounded-md bg-primary/10 flex items-center justify-center">
@@ -263,15 +338,10 @@ export default function DashboardPage() {
           <div className="h-64 relative">
             <DashboardMiniMap />
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Suspicious Messages ────────────────────────────────────────── */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="lg:col-span-2 bg-card rounded-xl cyber-border flex flex-col"
-        >
+        <div className="lg:col-span-2 bg-card rounded-xl cyber-border flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 rounded-md bg-destructive/10 flex items-center justify-center">
@@ -316,17 +386,12 @@ export default function DashboardPage() {
               )}
             </div>
           </ScrollArea>
-        </motion.div>
+        </div>
       </div>
 
       {/* Foreign Numbers + Crypto Wallets */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-card rounded-xl cyber-border p-4"
-        >
+        <div className="bg-card rounded-xl cyber-border p-4">
           <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
             <Globe className="h-4 w-4 text-yellow-500" />
             Foreign Numbers
@@ -345,14 +410,9 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground text-center py-4">None detected</p>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="bg-card rounded-xl cyber-border p-4"
-        >
+        <div className="bg-card rounded-xl cyber-border p-4">
           <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
             <Wallet className="h-4 w-4 text-primary" />
             Crypto Wallets
@@ -368,17 +428,12 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground text-center py-4">None detected</p>
             )}
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Platform breakdown */}
       {platforms.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-card rounded-xl cyber-border p-4"
-        >
+        <div className="bg-card rounded-xl cyber-border p-4">
           <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
             <TrendingUp className="h-4 w-4 text-primary" />
             Communication Platforms
@@ -396,7 +451,7 @@ export default function DashboardPage() {
               );
             })}
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Investigation Tools */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useInvestigation } from "@/contexts/InvestigationContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FolderOpen, Plus, Edit, Trash2, FileText, Users, Calendar, AlertTriangle } from "lucide-react";
+import { FolderOpen, Plus, Edit, Trash2, FileText, Users, Calendar, AlertTriangle, Loader2, Target, ShieldAlert, FileClock, Search, CheckCircle2, Database } from "lucide-react";
 import { toast } from "sonner";
-import { getCases, createCase, updateCase, deleteCase } from '@/lib/api';
+import { getCases, createCase, updateCase as updateCaseApi, deleteCase as deleteCaseApi } from '@/lib/api';
+import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "react-router-dom";
 
 interface Case {
   id: string;
@@ -30,10 +32,31 @@ interface CaseManagementProps {
 }
 
 export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
-  const { data } = useInvestigation();
-  const [cases, setCases] = useState<Case[]>([]);
-  const [loadingCases, setLoadingCases] = useState(true);
+  const { data, setActiveCaseId, setActiveCase: setGlobalActiveCase, activeCaseId } = useInvestigation();
+  const [cases, setCases] = useState<Case[]>(() => {
+    const cached = localStorage.getItem('forensix-all-cases');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        return parsed.map((c: any) => ({
+          ...c,
+          createdAt: new Date(c.createdAt),
+          updatedAt: new Date(c.updatedAt),
+        }));
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+  const [loadingCases, setLoadingCases] = useState(() => {
+    const cached = localStorage.getItem('forensix-all-cases');
+    return !cached;
+  });
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const location = useLocation();
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newCase, setNewCase] = useState<Partial<Case>>({
     title: "",
@@ -44,25 +67,47 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     notes: []
   });
 
-  // Load cases from MongoDB on mount
-useEffect(() => {
-  const fetchCases = async () => {
-    try {
-      const data = await getCases();
-      setCases(data.map((c: any) => ({
-        ...c,
-        id:        c.id || c._id,
-        createdAt: new Date(c.created_at || c.createdAt),
-        updatedAt: new Date(c.updated_at || c.updatedAt || c.created_at),
-      })));
-    } catch (err) {
-      toast.error('Failed to load cases');
-    } finally {
-      setLoadingCases(false);
+  // Automatically open the creation dialog if steered here by AI Action Card
+  useEffect(() => {
+    if (location.state?.openCreateModal) {
+      setIsCreateDialogOpen(true);
+      window.history.replaceState({}, document.title);
     }
-  };
-  fetchCases();
-}, []);
+  }, [location.state]);
+
+  // Load cases from MongoDB on mount
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const data = await getCases();
+        const formatted = data.map((c: any) => ({
+          ...c,
+          id: c.id || c._id,
+          createdAt: new Date(c.created_at || c.createdAt),
+          updatedAt: new Date(c.updated_at || c.updatedAt || c.created_at),
+        }));
+        setCases(formatted);
+
+        // If there's an active case globally, try to select it
+        if (activeCaseId) {
+          const matched = formatted.find((c: any) => c.id === activeCaseId);
+          if (matched) setSelectedCase(matched);
+        }
+      } catch (err) {
+        toast.error('Failed to load cases');
+      } finally {
+        setLoadingCases(false);
+      }
+    };
+    fetchCases();
+  }, [activeCaseId, location.state]);
+
+  // Sync mutations to cache automatically
+  useEffect(() => {
+    if (cases && cases.length > 0) {
+      localStorage.setItem('forensix-all-cases', JSON.stringify(cases));
+    }
+  }, [cases]);
 
   const handleCreateCase = async () => {
     if (!newCase.title || !newCase.description) {
@@ -78,113 +123,147 @@ useEffect(() => {
         tags:        newCase.tags || [],
         notes:       newCase.notes || [],
       });
-      setCases(prev => [{
+      const c = {
         ...created,
         id:        created.id || created._id,
         createdAt: new Date(created.created_at || created.createdAt),
         updatedAt: new Date(created.updated_at || created.updatedAt || created.created_at || new Date()),
-      }, ...prev]);
+      };
+      setCases(prev => [c, ...prev]);
       setIsCreateDialogOpen(false);
       setNewCase({ title: '', description: '', status: 'active', priority: 'medium', tags: [], notes: [] });
-      toast.success('Case created successfully');
+      toast.success('Investigation dossier created successfully');
+      
+      // Auto-select
+      setSelectedCase(c);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create case');
     }
   };
 
-  const updateCase = (id: string, updates: Partial<Case>) => {
-    setCases(prev => prev.map(c =>
-      c.id === id ? { ...c, ...updates, updatedAt: new Date() } : c
-    ));
-    toast.success("Case updated successfully");
-  };
-
-  const deleteCase = (id: string) => {
-    setCases(prev => prev.filter(c => c.id !== id));
-    if (selectedCase?.id === id) {
-      setSelectedCase(null);
+  const handleUpdateCaseStatus = async (id: string, newStatus: string) => {
+    try {
+      await updateCaseApi(id, { status: newStatus });
+      setCases(prev => prev.map(c => c.id === id ? { ...c, status: newStatus as any, updatedAt: new Date() } : c));
+      if (selectedCase?.id === id) {
+        setSelectedCase(prev => prev ? { ...prev, status: newStatus as any, updatedAt: new Date() } : null);
+      }
+      toast.success("Dossier status updated");
+    } catch (err) {
+      toast.error("Failed to update case");
     }
-    toast.success("Case deleted successfully");
   };
 
-  const addNote = (caseId: string, note: string) => {
+  const handleDeleteCase = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this intelligence dossier?")) return;
+    try {
+      await deleteCaseApi(id);
+      setCases(prev => prev.filter(c => c.id !== id));
+      if (selectedCase?.id === id) setSelectedCase(null);
+      if (activeCaseId === id) setActiveCaseId(null);
+      toast.success("Intelligence dossier expunged");
+    } catch (err) {
+      toast.error("Failed to delete case");
+    }
+  };
+
+  const addNote = async (caseId: string, note: string) => {
     if (!note.trim()) return;
-    setCases(prev => prev.map(c =>
-      c.id === caseId
-        ? { ...c, notes: [...c.notes, note], updatedAt: new Date() }
-        : c
-    ));
+    const targetCase = cases.find(c => c.id === caseId);
+    if (!targetCase) return;
+    
+    const newNotes = [...(targetCase.notes || []), note];
+    try {
+      await updateCaseApi(caseId, { notes: newNotes });
+      setCases(prev => prev.map(c => c.id === caseId ? { ...c, notes: newNotes, updatedAt: new Date() } : c));
+      if (selectedCase?.id === caseId) {
+        setSelectedCase(prev => prev ? { ...prev, notes: newNotes, updatedAt: new Date() } : null);
+      }
+    } catch (e) {
+      toast.error("Failed to append intelligence note");
+    }
+  };
+
+  const setAsActive = (c: Case) => {
+    setActiveCaseId(c.id);
+    setGlobalActiveCase(c);
+    onCaseSelect?.(c);
+    localStorage.removeItem('forensix-all-cases'); // force refresh in chat
+    toast.success(`Active operation switched to: ${c.title}`);
   };
 
   const getStatusColor = (status: Case["status"]) => {
     switch (status) {
-      case "active": return "bg-green-500";
-      case "closed": return "bg-gray-500";
-      case "archived": return "bg-blue-500";
-      default: return "bg-gray-500";
+      case "active": return "bg-emerald-500/20 text-emerald-400 border-emerald-500/50";
+      case "closed": return "bg-zinc-500/20 text-zinc-400 border-zinc-500/50";
+      case "archived": return "bg-blue-500/20 text-blue-400 border-blue-500/50";
+      default: return "bg-zinc-500/20 text-zinc-400 border-zinc-500/50";
     }
   };
 
   const getPriorityColor = (priority: Case["priority"]) => {
     switch (priority) {
-      case "low": return "text-green-600";
-      case "medium": return "text-yellow-600";
-      case "high": return "text-orange-600";
-      case "critical": return "text-red-600";
-      default: return "text-gray-600";
+      case "low": return "text-emerald-500";
+      case "medium": return "text-amber-500";
+      case "high": return "text-orange-500";
+      case "critical": return "text-red-500";
+      default: return "text-zinc-500";
     }
   };
 
-  if (!data) return null;
+  const filteredCases = cases.filter(c => 
+    c.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
-          <h1 className="text-2xl font-bold font-mono text-primary cyber-text-glow">Case Management</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Organize and track forensic investigations
+          <h1 className="text-3xl font-black font-mono tracking-[0.2em] uppercase text-primary mb-1">Intelligence Hub</h1>
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest opacity-60">
+            Chanakya Distributed Evidence Network • Central Dossier Management
           </p>
         </div>
+
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="font-mono uppercase tracking-widest cyber-glow h-10 px-6 font-bold" size="sm">
               <Plus className="h-4 w-4 mr-2" />
-              New Case
+              Initialize Dossier
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md border-primary/20 bg-card/95 backdrop-blur-xl">
             <DialogHeader>
-              <DialogTitle>Create New Case</DialogTitle>
+              <DialogTitle className="font-mono uppercase tracking-widest text-primary">New Intelligence Dossier</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Title *</label>
+            <div className="space-y-5 pt-2">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-mono tracking-widest text-muted-foreground">Operation Codename *</label>
                 <Input
                   value={newCase.title || ""}
                   onChange={(e) => setNewCase(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Case title"
+                  placeholder="e.g., OPERATION SATURN"
+                  className="font-mono uppercase bg-background/50"
+                  maxLength={50}
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium">Description *</label>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-mono tracking-widest text-muted-foreground">Executive Summary *</label>
                 <Textarea
                   value={newCase.description || ""}
                   onChange={(e) => setNewCase(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Case description"
+                  placeholder="Brief context for the investigation..."
                   rows={3}
+                  className="resize-none font-mono text-sm bg-background/50"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Status</label>
-                  <Select
-                    value={newCase.status}
-                    onValueChange={(value) => setNewCase(prev => ({ ...prev, status: value as Case["status"] }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-mono tracking-widest text-muted-foreground">Initial Status</label>
+                  <Select value={newCase.status} onValueChange={(v) => setNewCase(prev => ({ ...prev, status: v as Case["status"] }))}>
+                    <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="closed">Closed</SelectItem>
@@ -192,210 +271,278 @@ useEffect(() => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Priority</label>
-                  <Select
-                    value={newCase.priority}
-                    onValueChange={(value) => setNewCase(prev => ({ ...prev, priority: value as Case["priority"] }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-mono tracking-widest text-muted-foreground">Threat Level</label>
+                  <Select value={newCase.priority} onValueChange={(v) => setNewCase(prev => ({ ...prev, priority: v as Case["priority"] }))}>
+                    <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
+                      <SelectItem value="low">Low (Routine)</SelectItem>
+                      <SelectItem value="medium">Medium (Standard)</SelectItem>
+                      <SelectItem value="high">High (Elevated)</SelectItem>
+                      <SelectItem value="critical">Critical (Severe)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <Button onClick={handleCreateCase} className="w-full">
-                Create Case
+              <Button onClick={handleCreateCase} className="w-full mt-2 font-mono uppercase tracking-widest cyber-border font-bold">
+                Deploy Dossier
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Cases List */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FolderOpen className="h-5 w-5" />
-                Cases ({cases.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-96">
-                <div className="space-y-3">
-                  {cases.map((caseData) => (
-                    <div
-                      key={caseData.id}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedCase?.id === caseData.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                      onClick={() => {
-                        setSelectedCase(caseData);
-                        onCaseSelect?.(caseData);
-                      }}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-medium text-sm truncate">{caseData.title}</h3>
-                        <div className="flex items-center gap-1 ml-2">
-                          <div className={`w-2 h-2 rounded-full ${getStatusColor(caseData.status)}`} />
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                        {caseData.description}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline" className={`text-xs ${getPriorityColor(caseData.priority)}`}>
-                          {caseData.priority}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {caseData.createdAt.toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {cases.length === 0 && (
-                    <div className="text-center text-muted-foreground py-8">
-                      <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p className="text-sm">No cases created yet</p>
-                      <p className="text-xs mt-1">Create your first case to get started</p>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+      {/* METRICS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="bg-card/40 border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-primary/10 text-primary"><Database className="h-5 w-5" /></div>
+            <div>
+              <p className="text-2xl font-mono font-bold tracking-tighter">{cases.length}</p>
+              <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">Total Dossiers</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card/40 border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-500"><Target className="h-5 w-5" /></div>
+            <div>
+              <p className="text-2xl font-mono font-bold tracking-tighter">{cases.filter(c => c.status === 'active').length}</p>
+              <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">Active Operations</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card/40 border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-red-500/10 text-red-500"><ShieldAlert className="h-5 w-5" /></div>
+            <div>
+              <p className="text-2xl font-mono font-bold tracking-tighter">{cases.filter(c => c.priority === 'critical' || c.priority === 'high').length}</p>
+              <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">High Threat Level</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card/40 border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-blue-500/10 text-blue-500"><FileClock className="h-5 w-5" /></div>
+            <div>
+              <p className="text-2xl font-mono font-bold tracking-tighter">{cases.filter(c => c.status === 'closed').length}</p>
+              <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">Closed Cases</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* LEFT PANE: MASTER LIST */}
+        <div className="lg:col-span-4 flex flex-col gap-4 h-[600px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search intelligence index..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 font-mono text-xs uppercase tracking-wider bg-card/50"
+            />
+          </div>
+          
+          <div className="flex-1 rounded-xl border border-border bg-card/20 overflow-hidden flex flex-col">
+            <div className="p-3 border-b border-border bg-black/20 flex justify-between items-center shrink-0">
+              <span className="text-[10px] font-mono tracking-widest uppercase text-muted-foreground opacity-60">Directory Index</span>
+              <span className="text-[10px] font-mono tracking-widest uppercase text-primary">Found: {filteredCases.length}</span>
+            </div>
+            <ScrollArea className="flex-1 p-2">
+              <AnimatePresence>
+                {loadingCases ? (
+                  <div className="flex flex-col items-center justify-center py-12 opacity-50">
+                    <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest">Decrypting Files...</span>
+                  </div>
+                ) : filteredCases.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-12 opacity-50">
+                    <FolderOpen className="h-10 w-10 mx-auto mb-3" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest">No matching records</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredCases.map((caseData) => {
+                      const isSelected = selectedCase?.id === caseData.id;
+                      const isActive = activeCaseId === caseData.id;
+                      return (
+                        <motion.button
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          key={caseData.id}
+                          onClick={() => setSelectedCase(caseData)}
+                          className={`w-full text-left p-3 rounded-lg border transition-all relative overflow-hidden group ${
+                            isSelected 
+                              ? "bg-primary/10 border-primary/40 shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]" 
+                              : "border-transparent hover:bg-secondary/40 hover:border-border"
+                          }`}
+                        >
+                          {isActive && <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
+                          <div className="pl-2">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className={`font-mono text-xs uppercase tracking-wider font-bold truncate pr-2 ${isSelected ? 'text-primary' : ''}`}>
+                                {caseData.title}
+                              </h3>
+                              <Badge variant="outline" className={`text-[8px] uppercase tracking-widest px-1.5 py-0 rounded-sm ${getStatusColor(caseData.status)}`}>
+                                {caseData.status}
+                              </Badge>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground line-clamp-1 mb-2 opacity-70">
+                              {caseData.description}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <span className={`text-[9px] font-mono uppercase tracking-wider ${getPriorityColor(caseData.priority)}`}>
+                                LVL: {caseData.priority}
+                              </span>
+                              <span className="text-[9px] text-muted-foreground/50 font-mono tracking-tighter">
+                                {caseData.updatedAt.toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                )}
+              </AnimatePresence>
+            </ScrollArea>
+          </div>
         </div>
 
-        {/* Case Details */}
-        <div className="lg:col-span-2">
+        {/* RIGHT PANE: DOSSIER VIEW */}
+        <div className="lg:col-span-8 h-[600px]">
           {selectedCase ? (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
+            <Card className="h-full flex flex-col bg-card/20 backdrop-blur-xl border border-border shadow-2xl relative overflow-hidden">
+              {/* Background accent */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+              
+              <div className="p-6 border-b border-border bg-black/10 shrink-0">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <Badge className="bg-primary/10 text-primary hover:bg-primary/20 mb-3 text-[9px] uppercase tracking-[0.2em] font-mono border-primary/20">
+                      Intelligence Dossier #{selectedCase.id.slice(0,6).toUpperCase()}
+                    </Badge>
+                    <h2 className="text-2xl font-black font-mono tracking-widest uppercase text-foreground">
                       {selectedCase.title}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={getPriorityColor(selectedCase.priority)}>
-                        {selectedCase.priority}
-                      </Badge>
-                      <Badge variant="outline">
-                        <div className={`w-2 h-2 rounded-full mr-1 ${getStatusColor(selectedCase.status)}`} />
-                        {selectedCase.status}
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateCase(selectedCase.id, {
-                          status: selectedCase.status === "active" ? "closed" : "active"
-                        })}
-                      >
-                        {selectedCase.status === "active" ? "Close" : "Reopen"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteCase(selectedCase.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    </h2>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">{selectedCase.description}</p>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Created:</span> {selectedCase.createdAt.toLocaleString()}
-                    </div>
-                    <div>
-                      <span className="font-medium">Updated:</span> {selectedCase.updatedAt.toLocaleString()}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    {activeCaseId !== selectedCase.id ? (
+                      <Button onClick={() => setAsActive(selectedCase)} className="font-mono text-[10px] uppercase tracking-widest font-bold cyber-border" size="sm">
+                         Make Active Op
+                      </Button>
+                    ) : (
+                      <Badge className="bg-emerald-500/20 text-emerald-400 border-none font-mono text-[10px] uppercase py-1.5 px-3 flex items-center gap-2 tracking-widest">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Operations Active
+                      </Badge>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => handleUpdateCaseStatus(selectedCase.id, selectedCase.status === 'active' ? 'closed' : 'active')} className="text-[10px] font-mono uppercase">
+                      {selectedCase.status === "active" ? "Mark Closed" : "Re-open"}
+                    </Button>
+                    <Button variant="destructive" size="icon" onClick={() => handleDeleteCase(selectedCase.id)} className="h-8 w-8">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  {selectedCase.tags.length > 0 && (
-                    <div className="mt-4">
-                      <span className="font-medium text-sm">Tags:</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {selectedCase.tags.map((tag, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                </div>
+                
+                <p className="text-sm text-muted-foreground mb-5 leading-relaxed bg-black/20 p-4 rounded-xl border border-border/50">
+                  {selectedCase.description}
+                </p>
 
-              {/* Notes */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Investigation Notes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-48">
-                    <div className="space-y-3">
-                      {selectedCase.notes.map((note, i) => (
-                        <div key={i} className="p-3 bg-secondary rounded-lg">
-                          <p className="text-sm">{note}</p>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="p-3 bg-card/30 rounded-lg border border-border">
+                    <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Status</p>
+                    <p className={`font-mono text-xs uppercase font-bold ${getStatusColor(selectedCase.status).split(' ')[1]}`}>{selectedCase.status}</p>
+                  </div>
+                  <div className="p-3 bg-card/30 rounded-lg border border-border">
+                    <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Threat Level</p>
+                    <p className={`font-mono text-xs uppercase font-bold ${getPriorityColor(selectedCase.priority)}`}>{selectedCase.priority}</p>
+                  </div>
+                  <div className="p-3 bg-card/30 rounded-lg border border-border">
+                    <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Created On</p>
+                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.createdAt.toLocaleString()}</p>
+                  </div>
+                  <div className="p-3 bg-card/30 rounded-lg border border-border">
+                    <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Last Updated</p>
+                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.updatedAt.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Field Notes Section */}
+              <div className="flex-1 flex flex-col min-h-0 bg-background/30">
+                <div className="px-6 py-3 border-b border-border/50 flex items-center justify-between shrink-0">
+                  <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] font-bold text-primary/70">Field Intelligence Log</h3>
+                </div>
+                
+                <ScrollArea className="flex-1 p-6">
+                  <div className="space-y-4">
+                    {selectedCase.notes.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 opacity-40">
+                        <FileText className="h-12 w-12 mb-3" />
+                        <span className="text-xs font-mono uppercase tracking-widest">Log is empty</span>
+                      </div>
+                    ) : (
+                      selectedCase.notes.map((note, i) => (
+                        <div key={i} className="p-4 bg-card/50 rounded-xl border border-border/50 relative group">
+                          <span className="absolute top-4 right-4 text-[9px] font-mono text-muted-foreground opacity-50">Log #{i+1}</span>
+                          <p className="text-sm text-foreground/80 leading-relaxed font-mono whitespace-pre-wrap">{note}</p>
                         </div>
-                      ))}
-                      {selectedCase.notes.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          No notes added yet
-                        </p>
-                      )}
-                    </div>
-                  </ScrollArea>
-                  <div className="mt-4 flex gap-2">
-                    <Input
-                      placeholder="Add a note..."
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          addNote(selectedCase.id, (e.target as HTMLInputElement).value);
-                          (e.target as HTMLInputElement).value = "";
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+
+                <div className="p-6 pt-0 shrink-0">
+                  <div className="flex items-start gap-3 bg-black/20 p-3 rounded-xl border border-border">
+                    <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-serif text-sm">च</div>
+                    <Textarea
+                      placeholder="Add insight to dossier..."
+                      className="resize-none border-none bg-transparent focus-visible:ring-0 p-0 text-sm font-mono min-h-[40px]"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          const val = e.currentTarget.value;
+                          if(val) {
+                            addNote(selectedCase.id, val);
+                            e.currentTarget.value = "";
+                          }
                         }
                       }}
                     />
-                    <Button
+                    <Button 
+                      size="sm" 
+                      className="shrink-0 uppercase font-mono tracking-widest text-[10px] cyber-border h-8"
                       onClick={(e) => {
-                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                        const input = e.currentTarget.previousElementSibling as HTMLTextAreaElement;
                         addNote(selectedCase.id, input.value);
                         input.value = "";
                       }}
                     >
-                      Add
+                      Append Log
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center h-96">
-                <div className="text-center text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Select a case to view details</p>
                 </div>
-              </CardContent>
+              </div>
+
             </Card>
+          ) : (
+            <div className="h-full rounded-2xl border border-dashed border-border flex flex-col items-center justify-center bg-card/10 text-center p-10">
+              <div className="h-24 w-24 rounded-full bg-primary/5 flex items-center justify-center mb-6 border border-primary/10 shadow-[0_0_50px_rgba(var(--primary-rgb),0.1)]">
+                <Target className="h-10 w-10 text-primary/40" />
+              </div>
+              <h3 className="text-xl font-mono uppercase tracking-[0.2em] font-black text-foreground mb-2">No Dossier Selected</h3>
+              <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest opacity-60 max-w-sm">
+                Select an intelligence dossier from the index to view operational details and field notes.
+              </p>
+            </div>
           )}
         </div>
+
       </div>
     </div>
   );

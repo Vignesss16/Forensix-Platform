@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = '/api';
 // Get token from localStorage
 const getToken = () => localStorage.getItem('forensix_token');
 
@@ -27,13 +27,13 @@ const apiFetch = async (endpoint, options = {}) => {
 
 // ── AUTH ──────────────────────────────────────────────
 export const registerUser = (userData) =>
-  apiFetch('/auth/register', {
+  apiFetch('/auth?path=register', {
     method: 'POST',
     body: JSON.stringify(userData),
   });
 
 export const loginUser = (credentials) =>
-  apiFetch('/auth/login', {
+  apiFetch('/auth?path=login', {
     method: 'POST',
     body: JSON.stringify(credentials),
   });
@@ -48,13 +48,22 @@ export const createCase = (caseData) =>
   });
 
 export const updateCase = (id, caseData) =>
-  apiFetch(`/cases/${id}`, {
-    method: 'PUT',
+  apiFetch(`/cases?id=${id}`, {
+    method: 'PATCH',
     body: JSON.stringify(caseData),
   });
 
 export const deleteCase = (id) =>
-  apiFetch(`/cases/${id}`, { method: 'DELETE' });
+  apiFetch(`/cases?id=${id}`, { method: 'DELETE' });
+
+// ── CHATS ─────────────────────────────────────────────
+export const getChats = (caseId) => apiFetch(`/chats?caseId=${caseId}`);
+
+export const saveChat = (caseId, role, content) =>
+  apiFetch('/chats', {
+    method: 'POST',
+    body: JSON.stringify({ case_id: caseId, role, content }),
+  });
 
 // ── UPLOADS ───────────────────────────────────────────
 export const saveUpload = (uploadData) =>
@@ -65,7 +74,7 @@ export const saveUpload = (uploadData) =>
 
 export const getUploads = () => apiFetch('/uploads');
 
-export const getUploadById = (id) => apiFetch(`/uploads/${id}`);
+export const getUploadById = (id) => apiFetch(`/uploads?id=${id}`);
 
 // ── SAVED SEARCHES ────────────────────────────────────
 export const getSavedSearches = () => apiFetch('/searches');
@@ -77,4 +86,4 @@ export const saveSearch = (searchData) =>
   });
 
 export const deleteSavedSearch = (id) =>
-  apiFetch(`/searches/${id}`, { method: 'DELETE' });
+  apiFetch(`/searches?id=${id}`, { method: 'DELETE' });

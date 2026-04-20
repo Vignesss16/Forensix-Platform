@@ -174,7 +174,9 @@ export default function NetworkGraphPage() {
     }
   }, [filteredData]);
 
-  if (!data) return <Navigate to="/" replace />;
+  // We allow rendering without investigation data now to prevent navigation loops
+  // if (!data) return <Navigate to="/" replace />;
+
 
   return (
     <div className="flex flex-col h-screen">
@@ -251,36 +253,61 @@ export default function NetworkGraphPage() {
       </div>
 
       {/* Graph — fills remaining space */}
-      <div className="flex-1 bg-background overflow-hidden" ref={containerRef}>
-        <ForceGraph2D
-          ref={graphRef}
-          graphData={filteredData}
-          width={dimensions.width}
-          height={dimensions.height}
-          nodeColor={nodeColor}
-          nodeLabel={(node: Node) => `${node.label} (${node.type})`}
-          nodeRelSize={6}
-          nodeVal={(node: Node) => Math.max(node.val * 1.5, 3)}
-          linkColor={linkColor}
-          linkWidth={1.5}
-          linkDirectionalArrowLength={4}
-          linkDirectionalArrowRelPos={1}
-          linkLabel={(link: Link) => `${link.label} (${link.count || 1})`}
-          backgroundColor="hsl(220, 25%, 6%)"
-          nodeCanvasObjectMode={() => "after"}
-          onNodeClick={(node: Node) => setSelectedNode(node)}
-          onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
-          nodeCanvasObject={(node: Node, ctx: CanvasRenderingContext2D, globalScale: number) => {
-            const label = node.label || node.id;
-            const fontSize = Math.max(10 / globalScale, 2);
-            ctx.font = `${fontSize}px JetBrains Mono, monospace`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "top";
-            ctx.fillStyle = "hsl(50, 100%, 70%)";
-            ctx.fillText(label.length > 14 ? label.slice(0, 14) + ".." : label, node.x!, node.y! + 8);
-          }}
-        />
+      <div className="flex-1 bg-background overflow-hidden relative" ref={containerRef}>
+        {!data ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-12 bg-[#06080d] z-10 space-y-8">
+            <div className="relative text-center">
+              <div className="relative mb-6 mx-auto w-fit">
+                <Network className="h-16 w-16 text-primary/20 animate-pulse" />
+                <div className="absolute inset-x-0 bottom-0 h-0.5 bg-primary/20 rounded-full blur-sm" />
+              </div>
+              <p className="text-lg font-mono text-primary/60 cyber-text-glow">Link Analysis Engine Standby</p>
+              <p className="text-sm text-muted-foreground mt-2 max-w-sm text-center">
+                Select an active case or load sample evidence to generate the relationship graph.
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <Button onClick={() => (window.location.href='/upload')} variant="default" className="font-mono px-8">
+                Upload UFDR
+              </Button>
+              <Button onClick={() => (window.location.href='/upload')} variant="outline" className="font-mono px-8">
+                Load Sample
+              </Button>
+            </div>
+          </div>
+        ) : (
+
+          <ForceGraph2D
+            ref={graphRef}
+            graphData={filteredData}
+            width={dimensions.width}
+            height={dimensions.height}
+            nodeColor={nodeColor}
+            nodeLabel={(node: Node) => `${node.label} (${node.type})`}
+            nodeRelSize={6}
+            nodeVal={(node: Node) => Math.max(node.val * 1.5, 3)}
+            linkColor={linkColor}
+            linkWidth={1.5}
+            linkDirectionalArrowLength={4}
+            linkDirectionalArrowRelPos={1}
+            linkLabel={(link: Link) => `${link.label} (${link.count || 1})`}
+            backgroundColor="hsl(220, 25%, 6%)"
+            nodeCanvasObjectMode={() => "after"}
+            onNodeClick={(node: Node) => setSelectedNode(node)}
+            onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
+            nodeCanvasObject={(node: Node, ctx: CanvasRenderingContext2D, globalScale: number) => {
+              const label = node.label || node.id;
+              const fontSize = Math.max(10 / globalScale, 2);
+              ctx.font = `${fontSize}px JetBrains Mono, monospace`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              ctx.fillStyle = "hsl(50, 100%, 70%)";
+              ctx.fillText(label.length > 14 ? label.slice(0, 14) + ".." : label, node.x!, node.y! + 8);
+            }}
+          />
+        )}
       </div>
+
 
       {/* Node Details Modal */}
       {selectedNode && (

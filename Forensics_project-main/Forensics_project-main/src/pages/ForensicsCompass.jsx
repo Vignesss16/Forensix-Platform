@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ForceGraph2D from "react-force-graph-2d";
+import { motion, AnimatePresence } from "framer-motion";
 import jsPDF from "jspdf";
+import gsap from "@/lib/gsap-utils";
+import { useGSAP } from "@gsap/react";
+import { Shield, Search, Plus, Link as LinkIcon, BarChart3, Download, Trash2, Filter, MapPin, ExternalLink, Calendar, Brain, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link } from "react-router-dom";
 
 // ── constants ──────────────────────────────────────────────────────────────────
 const NODE_COLORS = {
@@ -92,6 +102,27 @@ export default function ForensicsCompass() {
       graphRef.current.zoom(2.5, 600);
     }
   }, [search, nodes]);
+
+  const containerRef = useRef(null);
+
+  useGSAP(() => {
+    const tl = gsap.timeline();
+    
+    // Page entrance
+    tl.from(".compass-header", { y: -20, opacity: 0, duration: 0.8, ease: "power3.out" })
+      .fromTo(".compass-title", 
+        { opacity: 0 }, 
+        { opacity: 1, duration: 0.3 }
+      ).to(".compass-title", {
+        duration: 1.5,
+        text: "FORENSICS COMPASS",
+        ease: "none"
+      }, "-=0.3")
+      .from(".toolbar-item", { x: -10, opacity: 0, duration: 0.4, stagger: 0.05, ease: "power2.out" }, "-=0.8")
+      .from(".graph-container", { scale: 0.98, opacity: 0, duration: 1, ease: "power3.out" }, "-=0.5")
+      .from(".control-panel", { y: 20, opacity: 0, duration: 0.6, stagger: 0.1, ease: "power2.out" }, "-=0.6");
+
+  }, { scope: containerRef });
 
   // ── add / remove ─────────────────────────────────────────────────────────────
   const addNode = () => {
@@ -290,206 +321,183 @@ export default function ForensicsCompass() {
 
   // ── render ────────────────────────────────────────────────────────────────────
   return (
-    <div style={styles.root}>
-      {/* ── header ── */}
-      <div style={styles.header}>
-        <span style={styles.headerTitle}>Forensics Compass</span>
-        <span style={styles.headerSub}>Entity Relationship Mapper</span>
+    <div className="max-w-6xl mx-auto p-6 space-y-6" ref={containerRef}>
+      {/* Header */}
+      <div className="compass-header flex items-baseline gap-4 border-b border-border pb-4">
+        <h1 className="text-2xl font-black font-mono text-primary tracking-widest uppercase compass-title">Forensics Compass</h1>
+        <span className="text-xs text-muted-foreground font-mono uppercase tracking-tighter opacity-60">Entity Relationship Mapper</span>
       </div>
 
-      {/* ── toolbar ── */}
-      <div style={styles.toolbar}>
-        <input
-          style={styles.searchInput}
-          type="text"
-          placeholder="Search nodes…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {["all", "suspect", "evidence", "location", "witness"].map((f) => (
-          <button
-            key={f}
-            style={{ ...styles.filterBtn, ...(filter === f ? styles.filterBtnActive : {}) }}
-            onClick={() => setFilter(f)}
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-64 toolbar-item">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            className="pl-9 font-mono text-xs" 
+            placeholder="Search nodes..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2 toolbar-item">
+          <Button 
+            variant={filter === "all" ? "default" : "outline"} 
+            size="sm" 
+            onClick={() => setFilter("all")} 
+            className="text-[10px] uppercase font-bold tracking-widest h-8"
           >
-            {f === "all" ? "All" : NODE_LABELS[f] + "s"}
-          </button>
-        ))}
-      </div>
-
-      {/* ── graph ── */}
-      <div style={styles.graphWrap}>
-        <ForceGraph2D
-          ref={graphRef}
-          graphData={graphData}
-          nodeCanvasObject={paintNode}
-          nodeCanvasObjectMode={() => "replace"}
-          linkCanvasObject={paintLink}
-          linkCanvasObjectMode={() => "replace"}
-          nodeRelSize={12}
-          linkDirectionalArrowLength={6}
-          linkDirectionalArrowRelPos={1}
-          onNodeRightClick={handleNodeRightClick}
-          backgroundColor="transparent"
-          width={undefined}
-          height={360}
-        />
-      </div>
-
-      {/* ── legend ── */}
-      <div style={styles.legend}>
-        {Object.entries(NODE_COLORS).map(([type, color]) => (
-          <div key={type} style={styles.legendItem}>
-            <div style={{ ...styles.legendDot, background: color }} />
-            <span>{NODE_LABELS[type]}</span>
-          </div>
-        ))}
-        <span style={styles.hint}>Right-click a node to remove it</span>
-      </div>
-
-      {/* ── bottom panels ── */}
-      <div style={styles.panelRow}>
-        {/* add node */}
-        <div style={styles.panel}>
-          <div style={styles.panelTitle}>Add Node</div>
-          <FormRow label="Name">
-            <input
-              style={styles.input}
-              type="text"
-              placeholder="e.g. John Doe"
-              value={nodeName}
-              onChange={(e) => setNodeName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addNode()}
-            />
-          </FormRow>
-          <FormRow label="Type">
-            <select style={styles.input} value={nodeType} onChange={(e) => setNodeType(e.target.value)}>
-              {Object.entries(NODE_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
-          </FormRow>
-          <FormRow label="Note">
-            <input
-              style={styles.input}
-              type="text"
-              placeholder="Optional detail"
-              value={nodeNote}
-              onChange={(e) => setNodeNote(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addNode()}
-            />
-          </FormRow>
-          <button style={styles.btn} onClick={addNode}>Add node</button>
-        </div>
-
-        {/* add link */}
-        <div style={styles.panel}>
-          <div style={styles.panelTitle}>Add Link</div>
-          <FormRow label="From">
-            <select style={styles.input} value={linkFrom} onChange={(e) => setLinkFrom(e.target.value)}>
-              {nodes.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
-            </select>
-          </FormRow>
-          <FormRow label="To">
-            <select style={styles.input} value={linkTo} onChange={(e) => setLinkTo(e.target.value)}>
-              {nodes.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
-            </select>
-          </FormRow>
-          <FormRow label="Label">
-            <input
-              style={styles.input}
-              type="text"
-              placeholder="e.g. witnessed"
-              value={linkLabel}
-              onChange={(e) => setLinkLabel(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addLink()}
-            />
-          </FormRow>
-          <button style={styles.btn} onClick={addLink}>Add link</button>
-        </div>
-
-        {/* stats + export */}
-        <div style={styles.panel}>
-          <div style={styles.panelTitle}>Case Stats</div>
-          {[
-            ["Suspects", stats.suspect, NODE_COLORS.suspect],
-            ["Evidence", stats.evidence, NODE_COLORS.evidence],
-            ["Locations", stats.location, NODE_COLORS.location],
-            ["Witnesses", stats.witness, NODE_COLORS.witness],
-            ["Connections", stats.links, "#888"],
-          ].map(([label, count, color]) => (
-            <div key={label} style={styles.statRow}>
-              <span style={styles.statLabel}>{label}</span>
-              <span style={{ ...styles.statValue, color }}>{count}</span>
-            </div>
+            All
+          </Button>
+          {Object.keys(NODE_LABELS).map((f) => (
+            <Button 
+              key={f}
+              variant={filter === f ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setFilter(f)}
+              className="text-[10px] uppercase font-bold tracking-widest h-8"
+            >
+              {NODE_LABELS[f]}S
+            </Button>
           ))}
-          <button style={{ ...styles.btn, ...styles.exportBtn }} onClick={exportPDF}>
-            Export PDF Report
-          </button>
         </div>
+      </div>
+
+      {/* Graph Area */}
+      <Card className="graph-container border-primary/10 bg-card/30 backdrop-blur-sm overflow-hidden">
+        <div className="h-[400px] relative">
+          <ForceGraph2D
+            ref={graphRef}
+            graphData={graphData}
+            nodeCanvasObject={paintNode}
+            nodeCanvasObjectMode={() => "replace"}
+            linkCanvasObject={paintLink}
+            linkCanvasObjectMode={() => "replace"}
+            nodeRelSize={12}
+            linkDirectionalArrowLength={6}
+            linkDirectionalArrowRelPos={1}
+            onNodeRightClick={handleNodeRightClick}
+            backgroundColor="transparent"
+            width={undefined}
+            height={400}
+          />
+          <div className="absolute top-4 right-4 flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-white/5 backdrop-blur-md">
+            {Object.entries(NODE_COLORS).map(([type, color]) => (
+              <div key={type} className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/70">
+                <div className="h-2 w-2 rounded-full" style={{ background: color }} />
+                <span>{NODE_LABELS[type]}</span>
+              </div>
+            ))}
+            <div className="mt-2 pt-2 border-t border-white/10 text-[8px] text-white/40 uppercase tracking-widest">
+              Right-click node to remove
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Control Panels */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Add Node */}
+        <Card className="control-panel cyber-border bg-card/20">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-[10px] uppercase font-mono tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+              <Plus className="h-3 w-3" /> Add Entity
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 px-4 pb-4">
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-mono text-muted-foreground ml-1">Name</label>
+              <Input className="h-8 text-xs font-mono" placeholder="Entity name..." value={nodeName} onChange={(e) => setNodeName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-mono text-muted-foreground ml-1">Type</label>
+              <Select value={nodeType} onValueChange={setNodeType}>
+                <SelectTrigger className="h-8 text-xs font-mono">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(NODE_LABELS).map(([v, l]) => (
+                    <SelectItem key={v} value={v} className="text-xs font-mono">{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-mono text-muted-foreground ml-1">Note</label>
+              <Input className="h-8 text-xs font-mono" placeholder="Optional notes..." value={nodeNote} onChange={(e) => setNodeNote(e.target.value)} />
+            </div>
+            <Button onClick={addNode} className="w-full h-8 text-[10px] font-bold tracking-widest mt-2 uppercase">Create Node</Button>
+          </CardContent>
+        </Card>
+
+        {/* Add Link */}
+        <Card className="control-panel cyber-border bg-card/20">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-[10px] uppercase font-mono tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+              <LinkIcon className="h-3 w-3" /> Establish Link
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 px-4 pb-4">
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-mono text-muted-foreground ml-1">From</label>
+              <Select value={linkFrom} onValueChange={setLinkFrom}>
+                <SelectTrigger className="h-8 text-xs font-mono">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {nodes.map((n) => <SelectItem key={n.id} value={n.id} className="text-xs font-mono">{n.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-mono text-muted-foreground ml-1">To</label>
+              <Select value={linkTo} onValueChange={setLinkTo}>
+                <SelectTrigger className="h-8 text-xs font-mono">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {nodes.map((n) => <SelectItem key={n.id} value={n.id} className="text-xs font-mono">{n.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-mono text-muted-foreground ml-1">Relation</label>
+              <Input className="h-8 text-xs font-mono" placeholder="witnessed, associate..." value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} />
+            </div>
+            <Button onClick={addLink} variant="secondary" className="w-full h-8 text-[10px] font-bold tracking-widest mt-2 uppercase">Connect</Button>
+          </CardContent>
+        </Card>
+
+        {/* Stats & Export */}
+        <Card className="control-panel cyber-border bg-card/20 border-primary/20">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-[10px] uppercase font-mono tracking-[0.2em] text-primary flex items-center gap-2">
+              <BarChart3 className="h-3 w-3" /> Case Intelligence
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 px-4 pb-4">
+            <div className="space-y-2">
+              {[
+                ["Suspects", stats.suspect, NODE_COLORS.suspect],
+                ["Evidence", stats.evidence, NODE_COLORS.evidence],
+                ["Locations", stats.location, NODE_COLORS.location],
+                ["Witnesses", stats.witness, NODE_COLORS.witness],
+                ["Connections", stats.links, "hsl(var(--muted-foreground))"],
+              ].map(([label, count, color]) => (
+                <div key={label} className="flex items-center justify-between font-mono text-xs border-b border-white/5 pb-1 last:border-0">
+                  <span className="text-muted-foreground uppercase text-[10px]">{label}</span>
+                  <Badge variant="outline" className="text-[10px] border-none font-bold" style={{ color }}>{count}</Badge>
+                </div>
+              ))}
+            </div>
+            <Button onClick={exportPDF} variant="default" className="w-full h-10 text-[10px] font-bold tracking-[0.2em] mt-4 uppercase cyber-glow shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]">
+              <Download className="h-3.5 w-3.5 mr-2" /> Export Case Dossier
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-// ── small helpers ──────────────────────────────────────────────────────────────
-function FormRow({ label, children }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-      <span style={{ fontSize: 12, color: "#888", width: 42, flexShrink: 0 }}>{label}</span>
-      {children}
-    </div>
-  );
-}
+// ── small helpers moved or replaced by shadcn components ────────────────────────
 
-// ── styles ────────────────────────────────────────────────────────────────────
-const styles = {
-  root: {
-    fontFamily: "system-ui, sans-serif",
-    maxWidth: 960,
-    margin: "0 auto",
-    padding: "0 0 24px",
-  },
-  header: {
-    background: "#1a1a1a",
-    padding: "14px 20px",
-    borderRadius: "10px 10px 0 0",
-    display: "flex",
-    alignItems: "baseline",
-    gap: 12,
-    marginBottom: 12,
-  },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em" },
-  headerSub: { color: "#888", fontSize: 12 },
-  toolbar: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10 },
-  searchInput: { fontSize: 13, padding: "5px 10px", borderRadius: 6, border: "1px solid #ddd", flex: "0 0 180px" },
-  filterBtn: {
-    fontSize: 12, padding: "5px 10px", borderRadius: 99,
-    border: "1px solid #ddd", background: "#fff", cursor: "pointer", color: "#666",
-  },
-  filterBtnActive: { background: "#1a1a1a", color: "#fff", borderColor: "#1a1a1a" },
-  graphWrap: {
-    border: "1px solid #e5e5e5", borderRadius: 10,
-    background: "#fafafa", overflow: "hidden", marginBottom: 10,
-  },
-  legend: { display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 12 },
-  legendItem: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#666" },
-  legendDot: { width: 10, height: 10, borderRadius: "50%" },
-  hint: { marginLeft: "auto", fontSize: 11, color: "#aaa" },
-  panelRow: { display: "flex", gap: 10, flexWrap: "wrap" },
-  panel: {
-    flex: 1, minWidth: 200,
-    background: "#fff", border: "1px solid #e5e5e5",
-    borderRadius: 10, padding: "14px 16px",
-  },
-  panelTitle: { fontSize: 11, fontWeight: 600, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 },
-  input: { flex: 1, fontSize: 13, padding: "4px 8px", borderRadius: 5, border: "1px solid #ddd", width: "100%" },
-  btn: {
-    width: "100%", marginTop: 6, fontSize: 13, padding: "7px 0",
-    borderRadius: 6, border: "1px solid #ddd", background: "#fff", cursor: "pointer",
-  },
-  exportBtn: { background: "#1a1a1a", color: "#fff", borderColor: "#1a1a1a", marginTop: 12 },
-  statRow: { display: "flex", justifyContent: "space-between", marginBottom: 5, fontSize: 13 },
-  statLabel: { color: "#888" },
-  statValue: { fontWeight: 600 },
-};

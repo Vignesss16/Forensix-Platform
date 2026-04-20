@@ -31,7 +31,8 @@ export default function ImagesPage() {
     return stats;
   }, [data]);
 
-  if (!data) return <Navigate to="/" replace />;
+  // if (!data) return <Navigate to="/" replace />;
+
 
   return (
     <div className="flex flex-col h-screen">
@@ -44,9 +45,10 @@ export default function ImagesPage() {
           </h1>
         </div>
         <p className="text-xs text-muted-foreground">
-          {data.images.length} files found
+          {data ? `${data.images.length} files found` : "No case data loaded"}
         </p>
       </div>
+
 
       {/* Controls */}
       <div className="p-4 border-b border-border space-y-4">
@@ -91,7 +93,12 @@ export default function ImagesPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-4">
-        {filteredImages.length === 0 ? (
+        {!data ? (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground border border-dashed rounded-lg bg-secondary/10">
+            <ImageIcon className="h-10 w-10 mb-2 opacity-20" />
+            <p className="text-sm font-mono">Select a case to view its media gallery</p>
+          </div>
+        ) : filteredImages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <p className="text-sm">No media files found</p>
           </div>
@@ -102,7 +109,7 @@ export default function ImagesPage() {
                 key={idx}
                 className="border border-border rounded p-4 hover:border-primary transition-colors"
               >
-                {/* Icon */}
+                {/* ... existing card code ... */}
                 <div className="mb-3 flex justify-center">
                   {img.url && img.filename.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                     <img src={img.url} alt={img.filename} className="w-full h-32 object-cover rounded-md mb-2 border border-border/50" />
@@ -167,6 +174,7 @@ export default function ImagesPage() {
           </div>
         )}
       </div>
+
     </div>
   );
 }

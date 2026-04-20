@@ -7,7 +7,8 @@ import { toast } from "sonner";
 export default function GeospatialPage() {
   const { data } = useInvestigation();
 
-  if (!data) return <Navigate to="/" replace />;
+
+
 
   const handleLocationClick = (record: ImageMetadata) => {
     toast.info(`Selected: ${record.filename}`, {
@@ -28,11 +29,18 @@ export default function GeospatialPage() {
       </div>
 
       <div className="flex-1 min-h-0">
-        <GeospatialAnalysis
-          records={data.rawRecords}
-          onLocationClick={handleLocationClick}
-        />
+        {data ? (
+          <GeospatialAnalysis
+            records={data.rawRecords}
+            onLocationClick={handleLocationClick}
+          />
+        ) : (
+          <div className="flex items-center justify-center p-12 border border-dashed rounded-lg bg-card/30">
+            <p className="text-muted-foreground italic">No geospatial data to display. Please select a case first.</p>
+          </div>
+        )}
       </div>
+
     </div>
   );
 }

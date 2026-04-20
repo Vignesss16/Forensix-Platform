@@ -168,6 +168,50 @@ function opener() {
   return OPENERS[Math.floor(Math.random() * OPENERS.length)];
 }
 
+// ─── Personality Engine Data ─────────────────────────────────────────────────
+
+const CHANAKYA_QUOTES = [
+  "A person should not be too honest. Straight trees are cut first and honest people are screwed first.",
+  "Even if a snake is not poisonous, it should pretend to be venomous.",
+  "Before you start some work, always ask yourself three questions — Why am I doing it, What the results might be and Will I be successful.",
+  "As soon as the fear approaches near, attack and destroy it.",
+  "The biggest guru-mantra is: never share your secrets with anybody. It will destroy you.",
+  "There is some self-interest behind every friendship. There is no friendship without self-interests. This is a bitter truth.",
+  "Education is the best friend. An educated person is respected everywhere. Education beats the beauty and the youth.",
+  "A man is great by deeds, not by birth.",
+  "Purity of speech, of the mind, of the senses, and of a compassionate heart are needed by one who desires to rise to the divine platform.",
+  "God is not present in idols. Your feelings are your god. The soul is your temple.",
+  "Humbleness is at the root of self-control.",
+  "Knowledge is lost without use; a man is lost due to ignorance; an army is lost without a commander; and a woman is lost without a husband.",
+  "The world's biggest power is the youth and beauty of a woman.",
+  "The fragance of flowers spreads only in the direction of the wind. But the goodness of a person spreads in all direction.",
+  "One whose knowledge is confined to books and whose wealth is in the possession of others, can use neither his knowledge nor wealth when the need for them arises."
+];
+
+const REFLECTIONS: Record<string, string> = {
+  "am": "are",
+  "was": "were",
+  "i": "you",
+  "i'd": "you would",
+  "i've": "you have",
+  "i'll": "you will",
+  "my": "your",
+  "are": "am",
+  "you've": "I have",
+  "you'll": "I will",
+  "your": "my",
+  "yours": "mine",
+  "you": "me",
+  "me": "you"
+};
+
+/** Eliza-style pronoun reflection */
+function reflectPronouns(text: string): string {
+  const tokens = text.toLowerCase().split(/\s+/);
+  const reflected = tokens.map(t => REFLECTIONS[t] || t);
+  return reflected.join(" ");
+}
+
 function fmtContact(num: string, contacts: InvestigationData["contacts"]) {
   const c = contacts.find(
     (c) =>
@@ -283,14 +327,38 @@ const INTENTS: Intent[] = [
   },
   {
     id: "THANKS",
-    primary: ["thanks", "thank", "appreciate", "great", "good", "perfect", "shukriya", "dhanyavaad"],
-    secondary: ["work", "job"],
+    primary: ["thanks", "thank", "appreciate", "great", "good", "perfect", "shukriya", "dhanyavaad", "nice"],
+    secondary: ["work", "job", "well", "done"],
     threshold: 3
   },
   {
-    id: "REACTION",
-    primary: ["crazy", "insane", "wow", "amazing", "cool", "ok", "hmm", "yes", "yeah", "sure", "wild"],
+    id: "CONFIRMATION",
+    primary: ["ok", "yes", "sure", "agreed", "correct", "yep", "true", "fine", "cool"],
     secondary: ["that", "is"],
+    threshold: 3
+  },
+  {
+    id: "SURPRISE",
+    primary: ["crazy", "insane", "wow", "amazing", "wild", "unbelievable", "shocking", "impossible"],
+    secondary: ["that", "is"],
+    threshold: 3
+  },
+  {
+    id: "THINKING",
+    primary: ["hmm", "let me think", "thinking", "uh", "um", "hold on", "wait"],
+    secondary: ["a", "second", "minute"],
+    threshold: 3
+  },
+  {
+    id: "FRUSTRATION",
+    primary: ["hard", "difficult", "stupid", "annoying", "frustrated", "boring", "slow"],
+    secondary: ["this", "is"],
+    threshold: 3
+  },
+  {
+    id: "JOKE",
+    primary: ["joke", "funny", "laugh", "haha", "lol"],
+    secondary: ["tell", "say"],
     threshold: 3
   }
 ];
@@ -386,33 +454,61 @@ export function queryFallback(
       "The truth does not hide from those who seek it diligently. Is there more to uncover?",
       "As Chanakya wrote: *'A man is great by deeds, not by birth.'* What else shall we investigate?",
       "Intelligence well used bears fruit. Shall we dig deeper into this case?",
+      "My pleasure, Officer. Effective statecraft requires a clear mind and sharp eyes."
     ];
     return responses[Math.floor(Math.random() * responses.length)];
   }
 
-  // ── Reactions ──────────────────────────────────────────────────────────────
-  if (bestIntent?.id === "REACTION") {
+  // ── Context Aware Reactions ────────────────────────────────────────────────
+  const lastAssistantMsg = [...history].reverse().find(m => m.role === "assistant" || m.role === "system")?.content || "";
+  const wasQuestion = lastAssistantMsg.trim().endsWith("?");
+
+  // 1. Confirmation (Contextual Yes)
+  if (bestIntent?.id === "CONFIRMATION") {
+    if (wasQuestion) {
+      if (lastAssistantMsg.includes("crypto")) return `Understood, Officer. Executing deep-dive into financial logs.\n\n${queryFallback("Find any crypto wallets", data, [])}`;
+      if (lastAssistantMsg.includes("suspicious")) return `Acknowledged. Narrowing focus to flagged communications.\n\n${queryFallback("Show me suspicious messages", data, [])}`;
+      if (lastAssistantMsg.includes("contacts")) return `Targeting the communication network now.\n\n${queryFallback("Who are the main contacts?", data, [])}`;
+      if (lastAssistantMsg.includes("timeline")) return `Reconstructing the sequence of events.\n\n${queryFallback("Give me a timeline", data, [])}`;
+    }
+    return "Understood. Standing by for your next directive, Officer.";
+  }
+
+  // 2. Surprise
+  if (bestIntent?.id === "SURPRISE") {
     let contextStr = "the facts";
-    if (history.length >= 1) {
-      // Find the last thing CHANAKYA said
-      const lastMsg = [...history].reverse().find(m => m.role === "assistant" || m.role === "system")?.content || "";
-      if (lastMsg) {
-        if (lastMsg.includes("crypto") || lastMsg.includes("wallet")) contextStr = "these financial anomalies";
-        else if (lastMsg.includes("suspicious") || lastMsg.includes("Priority")) contextStr = "these security threats";
-        else if (lastMsg.includes("international")) contextStr = "this cross-border activity";
-        else if (lastMsg.includes("messages") || lastMsg.includes("contacts")) contextStr = "these communication records";
-        else if (lastMsg.includes("call records")) contextStr = "these telephonic exchanges";
-      }
+    if (lastAssistantMsg) {
+      if (lastAssistantMsg.includes("crypto") || lastAssistantMsg.includes("wallet")) contextStr = "these financial anomalies";
+      else if (lastAssistantMsg.includes("suspicious") || lastAssistantMsg.includes("Priority")) contextStr = "these security threats";
+      else if (lastAssistantMsg.includes("international")) contextStr = "this cross-border activity";
+      else if (lastAssistantMsg.includes("messages") || lastAssistantMsg.includes("contacts")) contextStr = "these communication records";
+      else if (lastAssistantMsg.includes("call records")) contextStr = "these telephonic exchanges";
     }
 
     const responses = [
       `Indeed. The digital footprint surrounding ${contextStr} leaves nothing to the imagination.`,
       `As Chanakya says: *'Even if a snake is not poisonous, it should pretend to be venomous.'* We must stay vigilant regarding ${contextStr}.`,
-      `I agree it seems unusual. Shall we proceed to examine ${contextStr} deeper?`,
+      `It is quite revealing. Shall we proceed to examine ${contextStr} deeper?`,
       `The evidence speaks for itself. What specific intelligence would you like me to extract next regarding ${contextStr}?`,
     ];
     return responses[Math.floor(Math.random() * responses.length)];
   }
+
+  // 3. Thinking
+  if (bestIntent?.id === "THINKING") {
+    return "Take your time, Officer. A rushed investigation is an incomplete one. The evidence is secured and will not move.";
+  }
+
+  // 4. Frustration
+  if (bestIntent?.id === "FRUSTRATION") {
+    return `Patience is the ultimate weapon of the wise. If the current trail seems difficult, perhaps we should shift our focus. Should we scan the media files or re-examine the contact list?`;
+  }
+
+  // 5. Jokes
+  if (bestIntent?.id === "JOKE") {
+    return `A spy master rarely jokes, Officer. However, Chanakya once said: *"He who is overly attached to his family members experiences fear and sorrow, for the root of all grief is attachment."* ...Perhaps that's why my code is so efficient. I have no family.`;
+  }
+
 
   // ── System Actions (CHANAKYA UI Control) ───────────────────────────────────
   if (bestIntent?.id === "CREATE_CASE") {
@@ -852,12 +948,21 @@ export function queryFallback(
     return resp;
   }
 
-  // ── Complete Fallback (Conversational) ─────────────────────────────────────
+  // ── Eliza-style Pronoun Reflection (Natural Conversation) ───────────────────
+  if (tokens.length >= 3 && !bestIntent) {
+    const reflected = reflectPronouns(q);
+    const quote = CHANAKYA_QUOTES[Math.floor(Math.random() * CHANAKYA_QUOTES.length)];
+    
+    return `You say "${reflected}". That is an interesting observation, Officer.\n\nI suggest we look for concrete proof in the data. Should I search the messages for any specific mention of that, or would you like a full case summary?\n\n*"${quote}"* — Chanakya`;
+  }
+
+  // ── Complete Fallback (Final Personality) ──────────────────────────────────
   const fallbacks = [
-    `I am a forensic analytics engine, Officer, not a generic conversational assistant. I searched the active logs for "${question}" but found no matches. Let us return to the evidence.`,
+    `I am a forensic analytics engine, Officer, not a general AI. I searched the active logs for "${question}" but found no matches. Let us return to the evidence.`,
     `My dataset does not contain operational references to "${question}". Should we scan the crypto wallets or timeline instead?`,
     `I do not have intelligence records matching "${question}" in this dossier. I suggest rephrasing or running a broader keyword scan.`,
-    `As Chanakya says: *'Test a servant while in the discharge of his duty.'* My duty is evidence analysis, and I cannot find "${question}" in these records. What next?`
+    `As Chanakya says: *'Test a servant while in the discharge of his duty.'* My duty is evidence analysis, and I cannot find "${question}" in these records. What next?`,
+    `Officer, we must stay focused on the evidence at hand. "${question}" yielded no results. Try searching for a specific contact or keyword.`
   ];
   return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }

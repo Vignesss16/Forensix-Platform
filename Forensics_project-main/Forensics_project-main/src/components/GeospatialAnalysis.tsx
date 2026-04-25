@@ -450,7 +450,7 @@ export default function GeospatialAnalysis({
         )}
 
         {/* Map Pane */}
-        <div className="flex-1 relative rounded-xl overflow-hidden border border-border shadow-sm">
+        <div className="flex-1 min-h-[300px] md:min-h-0 relative rounded-xl overflow-hidden border border-border shadow-sm">
           {locationData.length === 0 && compact ? (
             <div className="h-full flex items-center justify-center bg-muted/20 text-muted-foreground">
               <div className="text-center">

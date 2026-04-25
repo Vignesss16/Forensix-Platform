@@ -124,13 +124,13 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
       {/* Logo */}
       <div className="p-5 border-b border-border">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5">
             <Shield className="h-7 w-7 text-primary logo-shield" />
             <div>
               <h1 className="text-base font-bold font-mono text-primary cyber-text-glow tracking-wide">CHANAKYA</h1>
               <p className="text-[10px] text-muted-foreground tracking-widest uppercase">Digital Forensics Platform</p>
             </div>
-          </div>
+          </Link>
           {/* Mobile close button */}
           <button onClick={() => setMobileOpen(false)} className="md:hidden p-1 rounded text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
@@ -249,10 +249,10 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
           <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all">
             <Menu className="h-5 w-5" />
           </button>
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
             <span className="text-sm font-bold font-mono text-primary tracking-widest">CHANAKYA</span>
-          </div>
+          </Link>
           {user && (
             <div className="text-[10px] font-mono text-primary font-bold">{user.id}</div>
           )}

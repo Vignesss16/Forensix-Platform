@@ -486,34 +486,15 @@ export default function AIChatPage() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {sidebarOpen && (
-        <motion.aside initial={{ width: 0, opacity: 0 }} animate={{ width: 288, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="absolute md:relative z-50 h-full shrink-0 border-r border-border bg-background md:bg-card/20 backdrop-blur-xl flex flex-col overflow-hidden shadow-2xl md:shadow-none">
-            {/* CHANAKYA header */}
-            <div className="p-4 border-b border-border space-y-3">
-              {/* Case switcher */}
-              <button
-                onClick={() => setShowCaseSwitcher(s => !s)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-secondary/30 hover:bg-secondary/60 border border-border transition-all group"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <FolderOpen className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span className="text-[10px] font-mono uppercase tracking-widest truncate text-muted-foreground">
-                    {activeCase ? activeCase.title : activeCaseId ? 'Case Active' : 'No Case'}
-                  </span>
-                </div>
-                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${showCaseSwitcher ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Case list dropdown */}
-              <AnimatePresence>
-        {sidebarOpen && (
-          <motion.aside
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            className="fixed md:relative z-[60] md:z-auto h-full w-[280px] bg-sidebar border-r border-border flex flex-col shadow-2xl md:shadow-none"
+          <motion.aside 
+            initial={{ x: -300, opacity: 0 }} 
+            animate={{ x: 0, opacity: 1 }} 
+            exit={{ x: -300, opacity: 0 }} 
+            className="fixed md:relative z-[60] md:z-auto h-full w-[288px] bg-background border-r border-border flex flex-col shadow-2xl md:shadow-none"
           >
+            {/* Dossier Header */}
             <div className="p-4 border-b border-border flex items-center justify-between">
               <h2 className="text-[10px] font-black font-mono tracking-[0.2em] text-primary uppercase">Dossier Index</h2>
               <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 hover:bg-secondary rounded">
@@ -521,38 +502,54 @@ export default function AIChatPage() {
               </button>
             </div>
             
-            <div className="p-4 bg-black/10">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[9px] font-mono uppercase text-muted-foreground opacity-50">Active Case</span>
-                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowCaseSwitcher(!showCaseSwitcher)}>
-                  <GitBranch className="h-3 w-3" />
-                </Button>
+            <div className="p-4 bg-black/10 space-y-4">
+              {/* Case Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[9px] font-mono uppercase text-muted-foreground opacity-50">Active Case</span>
+                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowCaseSwitcher(!showCaseSwitcher)}>
+                    <GitBranch className="h-3 w-3" />
+                  </Button>
+                </div>
+                
+                <button
+                  onClick={() => setShowCaseSwitcher(s => !s)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/30 hover:bg-secondary/60 border border-border transition-all group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FolderOpen className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest truncate text-muted-foreground">
+                      {activeCase ? activeCase.title : activeCaseId ? 'Case Active' : 'No Case'}
+                    </span>
+                  </div>
+                  <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${showCaseSwitcher ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {showCaseSwitcher && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden mt-2"
+                    >
+                      <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                        {allCases.map((c: any) => (
+                          <button
+                            key={c.id || c._id}
+                            onClick={() => { setActiveCaseId(c.id || c._id); setShowCaseSwitcher(false); }}
+                            className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 transition-all ${
+                              (c.id || c._id) === activeCaseId ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-secondary/50 text-muted-foreground border border-transparent'
+                            }`}
+                          >
+                            <span className="text-[10px] font-mono uppercase truncate">{c.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-              
-              <AnimatePresence>
-                {showCaseSwitcher && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden mb-4"
-                  >
-                    <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                      {allCases.map((c: any) => (
-                        <button
-                          key={c.id || c._id}
-                          onClick={() => { setActiveCaseId(c.id || c._id); setShowCaseSwitcher(false); }}
-                          className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 transition-all ${
-                            (c.id || c._id) === activeCaseId ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-secondary/50 text-muted-foreground border border-transparent'
-                          }`}
-                        >
-                          <span className="text-[10px] font-mono uppercase truncate">{c.title}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               <Button onClick={createConversation} className="w-full justify-start gap-2 cyber-border uppercase text-[10px] tracking-widest font-bold" variant="secondary" size="sm">
                 <Plus className="h-4 w-4" /> New Investigation
@@ -577,8 +574,8 @@ export default function AIChatPage() {
             </div>
           </motion.aside>
         )}
-
       </AnimatePresence>
+
 
       <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden" ref={chatWindowRef}>
         {/* Forensic Watermark */}

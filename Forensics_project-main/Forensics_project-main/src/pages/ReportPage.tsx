@@ -396,6 +396,8 @@ export default function ReportPage() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const contentWidth = pageWidth - margin * 2;
+      const caseId = data?.caseId || "N/A";
+      const caseTitle = data?.caseTitle || "UNNAMED_OPERATION";
 
       // Professional Colors
       const colorNavy = [2, 6, 23]; // hsl(222, 47%, 5%)

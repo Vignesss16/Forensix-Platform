@@ -577,7 +577,7 @@ export default function AIChatPage() {
       </AnimatePresence>
 
 
-      <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden" ref={chatWindowRef}>
+      <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden" ref={chatWindowRef}>
         {/* Forensic Watermark */}
         <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none z-0">
           <div className="text-[15vw] font-black font-mono rotate-[-30deg] uppercase tracking-[0.5em]">Secret Analysis</div>

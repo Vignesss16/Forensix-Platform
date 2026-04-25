@@ -472,7 +472,7 @@ export default function AIChatPage() {
 
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-background relative" ref={containerRef}>
+    <div className="flex h-full overflow-hidden bg-background relative" ref={containerRef}>
       {/* Mobile Backdrop */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -583,7 +583,7 @@ export default function AIChatPage() {
           <div className="text-[15vw] font-black font-mono rotate-[-30deg] uppercase tracking-[0.5em]">Secret Analysis</div>
         </div>
 
-        <div className="shrink-0 border-b border-border px-3 md:px-6 py-3 md:py-4 flex items-center justify-between bg-card/10 backdrop-blur-xl z-10">
+        <div className="shrink-0 border-b border-border px-3 md:px-6 py-3 md:py-4 flex items-center justify-between bg-card/10 backdrop-blur-xl z-20 sticky top-0">
           <div className="flex items-center gap-2 md:gap-4 min-w-0">
             <button 
               onClick={() => setSidebarOpen((s) => !s)} 

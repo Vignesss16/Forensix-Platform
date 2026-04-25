@@ -245,7 +245,7 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar/80 backdrop-blur-lg shrink-0 z-50">
+        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar/80 backdrop-blur-lg shrink-0 z-50 sticky top-0">
           <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all">
             <Menu className="h-5 w-5" />
           </button>

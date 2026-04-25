@@ -388,7 +388,7 @@ export function queryFallback(
 
   // ── Forensic Knowledge Base Lookup ─────────────────────────────────────────
   const matchingScenario = FORENSIC_KNOWLEDGE.find(s => 
-    s.keywords.some(k => queryLower.includes(k.toLowerCase()))
+    s.keywords.some(k => q.includes(k.toLowerCase()))
   );
 
   if (matchingScenario) {

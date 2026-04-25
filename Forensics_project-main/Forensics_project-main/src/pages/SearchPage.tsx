@@ -6,7 +6,7 @@ import { ForensicRecord } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Upload, Sparkles } from "lucide-react";
+import { Search, Upload, Sparkles, MessageSquare, Phone, Users } from "lucide-react";
 
 export default function SearchPage() {
   const { data } = useInvestigation();

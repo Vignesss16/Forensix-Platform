@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import gsap from "@/lib/gsap-utils";
 import { useGSAP } from "@gsap/react";
 import {
-  Send, Plus, Trash2, Download, Shield, WifiOff, Copy, ChevronRight, Sparkles, MessageCircle, X, FolderOpen, CheckCircle2, ChevronDown, PanelLeft
+  Send, Plus, Trash2, Download, Shield, WifiOff, Copy, ChevronRight, Sparkles, MessageCircle, X, FolderOpen, CheckCircle2, ChevronDown, PanelLeft, GitBranch
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";

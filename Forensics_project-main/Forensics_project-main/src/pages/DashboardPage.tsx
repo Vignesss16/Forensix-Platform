@@ -298,12 +298,15 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-start md:items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-base md:text-xl font-bold font-mono text-primary cyber-text-glow dashboard-title">
-            Investigation Dashboard
+          <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow uppercase dashboard-title">
+            MISSION DASHBOARD
           </h1>
-          <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-            {data ? `${data.rawRecords.length} forensic records analysed` : "Waiting for forensic data upload..."}
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 uppercase tracking-widest px-2 py-0">
+              Operational Status: Active
+            </Badge>
+            <span className="hidden sm:inline text-[10px] text-muted-foreground/40 font-mono uppercase tracking-tighter">Secure Link Established</span>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {highSeverity > 0 && (

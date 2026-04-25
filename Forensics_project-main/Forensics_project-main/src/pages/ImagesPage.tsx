@@ -40,8 +40,8 @@ export default function ImagesPage() {
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2 mb-4">
           <ImageIcon className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-bold font-mono text-primary cyber-text-glow">
-            Media Gallery
+          <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow uppercase">
+            Media Forensics
           </h1>
         </div>
         <p className="text-xs text-muted-foreground">

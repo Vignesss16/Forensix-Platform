@@ -16,11 +16,11 @@ export default function SearchPage() {
   return (
     <div className="p-6 flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold font-mono text-primary cyber-text-glow flex items-center gap-2">
+        <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow flex items-center gap-3 uppercase">
           <Search className="h-6 w-6" />
           Advanced Search
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 opacity-60 font-mono">
           Search through all forensic records with advanced filters and criteria
         </p>
       </div>

@@ -271,8 +271,8 @@ export default function UploadPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-8 overflow-hidden bg-background" ref={containerRef}>
       <div className="text-center mb-10 opacity-0" ref={contentRef}>
-        <h1 className="text-4xl font-bold font-mono text-primary cyber-text-glow mb-3">
-          UFDR File Analysis
+        <h1 className="text-4xl font-black font-mono text-primary cyber-text-glow mb-3 tracking-[0.2em] uppercase">
+          Evidence Upload
         </h1>
         <p className="text-muted-foreground max-w-lg mx-auto">
           Upload forensic data reports extracted from mobile devices. Supported formats: JSON, XML.

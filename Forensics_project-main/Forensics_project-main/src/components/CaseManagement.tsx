@@ -172,7 +172,16 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     const targetCase = cases.find(c => c.id === caseId);
     if (!targetCase) return;
     
-    const newNotes = [...(targetCase.notes || []), note];
+    // Prevent duplicate strategies - remove old one if new one is a roadmap
+    const isNewRoadmap = note.includes("Based on the UFDR analysis");
+    let newNotes = [...(targetCase.notes || [])];
+    
+    if (isNewRoadmap) {
+      newNotes = newNotes.filter(n => !n.includes("Based on the UFDR analysis"));
+    }
+    
+    newNotes.push(note);
+
     try {
       await updateCaseApi(caseId, { notes: newNotes });
       setCases(prev => prev.map(c => c.id === caseId ? { ...c, notes: newNotes, updatedAt: new Date() } : c));
@@ -181,6 +190,46 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
       }
     } catch (e) {
       toast.error("Failed to append intelligence note");
+    }
+  };
+
+  const handleToggleRoadmapTask = async (caseId: string, noteIndex: number, taskKey: string) => {
+    const targetCase = cases.find(c => c.id === caseId);
+    if (!targetCase) return;
+
+    const [phaseIdx, taskIdx] = taskKey.split('-').map(Number);
+    const newNotes = [...targetCase.notes];
+    let note = newNotes[noteIndex];
+
+    const rawPhases = note.split(/(?=### Phase \d+: )/);
+    // Find the phase content (the one after the split)
+    // Note: split with lookahead keeps the delimiter
+    const targetPhase = rawPhases[phaseIdx + (note.startsWith("###") ? 0 : 1)];
+    const lines = targetPhase.split("\n");
+    let currentTaskCount = 0;
+    
+    const updatedLines = lines.map(line => {
+      if (line.trim().startsWith("- [")) {
+        if (currentTaskCount === taskIdx) {
+          currentTaskCount++;
+          return line.includes("[x]") ? line.replace("[x]", "[ ]") : line.replace("[ ]", "[x]");
+        }
+        currentTaskCount++;
+      }
+      return line;
+    });
+
+    rawPhases[phaseIdx + (note.startsWith("###") ? 0 : 1)] = updatedLines.join("\n");
+    newNotes[noteIndex] = rawPhases.join("");
+
+    try {
+      await updateCaseApi(caseId, { notes: newNotes });
+      setCases(prev => prev.map(c => c.id === caseId ? { ...c, notes: newNotes, updatedAt: new Date() } : c));
+      if (selectedCase?.id === caseId) {
+        setSelectedCase(prev => prev ? { ...prev, notes: newNotes, updatedAt: new Date() } : null);
+      }
+    } catch (e) {
+      toast.error("Failed to update task state");
     }
   };
 
@@ -424,6 +473,13 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                     {filteredCases.map((caseData) => {
                       const isSelected = selectedCase?.id === caseData.id;
                       const isActive = activeCaseId === caseData.id;
+                      
+                      // Calculate progress for this case
+                      const roadmapNote = caseData.notes.find(n => n.includes("Based on the UFDR analysis"));
+                      const allTasks = roadmapNote?.match(/- \[[ x]\]/g) || [];
+                      const completedTasks = roadmapNote?.match(/- \[x\]/g) || [];
+                      const progressPercent = allTasks.length > 0 ? Math.round((completedTasks.length / allTasks.length) * 100) : 0;
+
                       return (
                         <motion.button
                           layout
@@ -451,14 +507,28 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                               {caseData.description}
                             </p>
                             <div className="flex items-center justify-between">
-                              <span className={`text-[9px] font-mono uppercase tracking-wider ${getPriorityColor(caseData.priority)}`}>
-                                LVL: {caseData.priority}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[9px] font-mono uppercase tracking-wider ${getPriorityColor(caseData.priority)}`}>
+                                  LVL: {caseData.priority}
+                                </span>
+                                {roadmapNote && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                                    <span className="text-[8px] font-mono text-primary/60">{progressPercent}% DONE</span>
+                                  </div>
+                                )}
+                              </div>
                               <span className="text-[9px] text-muted-foreground/50 font-mono tracking-tighter">
                                 {caseData.updatedAt.toLocaleDateString()}
                               </span>
                             </div>
                           </div>
+                          {/* Progress micro-bar at the bottom */}
+                          {roadmapNote && (
+                            <div className="absolute bottom-0 left-0 h-[1px] bg-primary/20 w-full">
+                              <div className="h-full bg-primary/40 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+                            </div>
+                          )}
                         </motion.button>
                       );
                     })}
@@ -513,7 +583,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                   {selectedCase.description}
                 </p>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
                   <div className="p-3 bg-card/30 rounded-lg border border-border">
                     <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Status</p>
                     <p className={`font-mono text-xs uppercase font-bold ${getStatusColor(selectedCase.status).split(' ')[1]}`}>{selectedCase.status}</p>
@@ -523,12 +593,18 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                     <p className={`font-mono text-xs uppercase font-bold ${getPriorityColor(selectedCase.priority)}`}>{selectedCase.priority}</p>
                   </div>
                   <div className="p-3 bg-card/30 rounded-lg border border-border">
+                    <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Duration</p>
+                    <p className="font-mono text-xs text-primary font-bold">
+                      {Math.floor((Date.now() - selectedCase.createdAt.getTime()) / (1000 * 60 * 60 * 24))} DAYS ELAPSED
+                    </p>
+                  </div>
+                  <div className="p-3 bg-card/30 rounded-lg border border-border">
                     <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Created On</p>
-                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.createdAt.toLocaleString('en-IN')}</p>
+                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.createdAt.toLocaleDateString('en-IN')}</p>
                   </div>
                   <div className="p-3 bg-card/30 rounded-lg border border-border">
                     <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Last Updated</p>
-                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.updatedAt.toLocaleString('en-IN')}</p>
+                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.updatedAt.toLocaleDateString('en-IN')}</p>
                   </div>
                 </div>
               </div>
@@ -563,7 +639,10 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                           <div key={i} className={`p-4 rounded-xl border border-border/50 relative group ${isRoadmap ? 'bg-primary/5 border-primary/20 p-6' : 'bg-card/50'}`}>
                             <span className="absolute top-4 right-4 text-[9px] font-mono text-muted-foreground opacity-50">Log #{i+1}</span>
                             {isRoadmap ? (
-                              <InvestigationRoadmap content={note} />
+                              <InvestigationRoadmap 
+                                content={note} 
+                                onToggleTask={(taskKey) => handleToggleRoadmapTask(selectedCase.id, i, taskKey)} 
+                              />
                             ) : (
                               <p className="text-sm text-foreground/80 leading-relaxed font-mono whitespace-pre-wrap">{note}</p>
                             )}

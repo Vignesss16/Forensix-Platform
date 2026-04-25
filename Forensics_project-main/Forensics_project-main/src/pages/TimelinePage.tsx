@@ -99,8 +99,8 @@ export default function TimelinePage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                <h1 className="text-lg font-bold font-mono text-primary cyber-text-glow">
-                  Advanced Timeline
+                <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow uppercase">
+                  Evidence Timeline
                 </h1>
               </div>
               <div className="flex gap-2">

@@ -197,11 +197,12 @@ export default function NetworkGraphPage() {
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-lg font-bold font-mono text-primary cyber-text-glow flex items-center gap-2">
-            <Network className="h-5 w-5" /> Link Analysis
+          <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow flex items-center gap-3 uppercase">
+            <Network className="h-6 w-6" />
+            Network Analysis
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            {filteredData.nodes.length} entities · {filteredData.links.length} connections
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 opacity-60 font-mono">
+            {filteredData.nodes.length} entities identified · {filteredData.links.length} relationships mapped
           </p>
         </div>
 

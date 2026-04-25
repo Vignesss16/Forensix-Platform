@@ -12,16 +12,16 @@ import { useShortcut } from "@/contexts/KeyboardShortcutsContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 
 const navItems = [
-  { to: "/upload", label: "Upload", icon: Upload },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/search", label: "Search", icon: Search },
-  { to: "/geospatial", label: "Maps", icon: MapPin },
-  { to: "/cases", label: "Cases", icon: FolderOpen },
-  { to: "/chat", label: "AI Search", icon: MessageSquare },
-  { to: "/graph", label: "Network", icon: Network },
-  { to: "/timeline", label: "Timeline", icon: Clock },
-  { to: "/images", label: "Media", icon: Image },
-  { to: "/report", label: "Report", icon: FileText },
+  { to: "/upload", label: "Evidence Upload", icon: Upload },
+  { to: "/dashboard", label: "Mission Dashboard", icon: LayoutDashboard },
+  { to: "/search", label: "Advanced Search", icon: Search },
+  { to: "/geospatial", label: "Geospatial Maps", icon: MapPin },
+  { to: "/cases", label: "Intelligence Hub", icon: FolderOpen },
+  { to: "/chat", label: "AI Assistant", icon: MessageSquare },
+  { to: "/graph", label: "Network Graph", icon: Network },
+  { to: "/timeline", label: "Evidence Timeline", icon: Clock },
+  { to: "/images", label: "Media Forensics", icon: Image },
+  { to: "/report", label: "Forensic Report", icon: FileText },
 ];
 
 interface LayoutProps {
@@ -245,16 +245,19 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar/80 backdrop-blur-lg shrink-0">
+        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar/80 backdrop-blur-lg shrink-0 z-50">
           <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all">
             <Menu className="h-5 w-5" />
           </button>
           <Link to="/" className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
-            <span className="text-sm font-bold font-mono text-primary tracking-widest">CHANAKYA</span>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] font-black font-mono text-primary tracking-[0.2em] uppercase">CHANAKYA</span>
+              <span className="text-[7px] text-muted-foreground font-mono uppercase tracking-[0.1em] opacity-60">Digital Forensics Platform</span>
+            </div>
           </Link>
           {user && (
-            <div className="text-[10px] font-mono text-primary font-bold">{user.id}</div>
+            <div className="text-[10px] font-mono text-primary font-bold opacity-70">{user.id}</div>
           )}
         </header>
 

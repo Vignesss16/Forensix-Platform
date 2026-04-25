@@ -592,11 +592,11 @@ export default function AIChatPage() {
               <PanelLeft className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <h1 className="text-[10px] md:text-xs font-black font-mono tracking-[0.15em] md:tracking-[0.2em] flex items-center gap-2 md:gap-3 text-primary uppercase chat-title">
-                CHANAKYA AI ANALYST
+              <h1 className="text-[10px] md:text-xs font-black font-mono tracking-[0.15em] md:tracking-[0.25em] flex items-center gap-2 md:gap-3 text-primary uppercase chat-title">
+                CHANAKYA | AI ASSISTANT
               </h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-primary/20 bg-primary/5 uppercase tracking-widest h-4">
+                <Badge variant="outline" className="text-[7px] md:text-[8px] px-1.5 py-0 border-primary/20 bg-primary/5 uppercase tracking-widest h-4">
                   {data ? "LIVE ANALYTICS" : "HISTORICAL VIEW"}
                 </Badge>
                 <span className="hidden sm:inline text-[9px] text-muted-foreground/40 font-mono uppercase tracking-tighter">SECURE CHANNEL</span>

@@ -84,102 +84,292 @@ export default function ReportPage() {
   };
 
   const exportHTML = () => {
+    const caseTitle = data?.caseTitle || "UNNAMED_OPERATION";
+    const caseId = data?.caseId || "N/A";
+    const daysElapsed = data?.createdAt ? Math.floor((Date.now() - new Date(data.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHANAKYA Intelligence Report - Confidential</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <title>CHANAKYA | Intelligence Report | ${caseTitle}</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;600;900&display=swap" rel="stylesheet">
     <style>
-        :root { --primary: #2563eb; --border: #e5e7eb; }
-        body { font-family: 'Inter', sans-serif; margin: 0; padding: 40px; color: #1f2937; line-height: 1.6; background: #f9fafb; position: relative; }
-        .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 120px; color: rgba(0,0,0,0.03); font-weight: 900; z-index: -1; pointer-events: none; white-space: nowrap; font-family: sans-serif; }
-        .page { background: white; max-width: 850px; margin: 0 auto; padding: 60px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border-radius: 8px; border: 1px solid var(--border); }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #111; padding-bottom: 25px; margin-bottom: 40px; }
-        .logo-section h1 { font-family: 'JetBrains Mono', monospace; font-size: 28px; margin: 0; letter-spacing: 4px; color: #111; }
-        .logo-section p { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #666; margin: 5px 0 0 0; }
-        .meta-section { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #444; }
-        .doc-title { text-align: center; font-size: 24px; font-weight: 900; text-transform: uppercase; margin: 40px 0; letter-spacing: 2px; border-top: 1px solid #eee; border-bottom: 1px solid #eee; padding: 15px 0; }
-        .section { margin-bottom: 45px; }
-        .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #111; border-left: 4px solid var(--primary); padding-left: 12px; margin-bottom: 20px; }
-        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-        .stat-card { border: 1px solid #eee; padding: 15px; border-radius: 6px; }
-        .stat-val { font-size: 18px; font-weight: 700; color: var(--primary); }
-        .stat-lab { font-size: 10px; text-transform: uppercase; color: #666; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        th { text-align: left; background: #f8fafc; border-bottom: 2px solid #eee; padding: 12px 8px; text-transform: uppercase; font-size: 10px; }
-        td { border-bottom: 1px solid #f1f5f9; padding: 12px 8px; vertical-align: top; }
-        .severity-high { color: #ef4444; font-weight: 700; }
-        .footer { margin-top: 60px; border-top: 1px solid #eee; padding-top: 20px; font-size: 10px; color: #999; display: flex; justify-content: space-between; }
-        @media print { body { background: white; padding: 0; } .page { box-shadow: none; border: none; max-width: 100%; } }
+        :root { 
+            --primary: #06b6d4; 
+            --bg: #020617; 
+            --card: #0f172a; 
+            --border: rgba(6, 182, 212, 0.2);
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+            --crimson: #ef4444;
+            --amber: #f59e0b;
+        }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; 
+            padding: 40px; 
+            background: var(--bg); 
+            color: var(--text);
+            line-height: 1.5;
+        }
+        .watermark { 
+            position: fixed; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%) rotate(-35deg); 
+            font-size: 140px; 
+            color: rgba(6, 182, 212, 0.05); 
+            font-weight: 900; 
+            z-index: -1; 
+            pointer-events: none; 
+            white-space: nowrap; 
+            font-family: 'Inter', sans-serif;
+            letter-spacing: 20px;
+        }
+        .page { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 50px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+        .page::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, var(--primary), transparent);
+        }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start; 
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid var(--border);
+        }
+        .logo-section h1 { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 32px; 
+            margin: 0; 
+            letter-spacing: 6px; 
+            color: var(--primary);
+            font-weight: 800;
+        }
+        .logo-section p { 
+            font-size: 10px; 
+            text-transform: uppercase; 
+            letter-spacing: 3px; 
+            color: var(--muted); 
+            margin: 8px 0 0 0; 
+            font-weight: 600;
+        }
+        .meta-table { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 10px; 
+            text-align: right; 
+            color: var(--muted);
+        }
+        .meta-table td { padding: 2px 0 2px 20px; }
+        .meta-val { color: var(--primary); font-weight: 700; }
+
+        .doc-title { 
+            text-align: center; 
+            margin: 40px 0; 
+        }
+        .doc-title h2 {
+            font-size: 20px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin: 0;
+            color: var(--text);
+        }
+        .doc-title .case-name {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 5px 15px;
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid var(--border);
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+
+        .section { margin-bottom: 50px; }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .section-header h3 {
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--primary);
+            margin: 0;
+        }
+        .section-header .line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .summary-box {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 20px;
+            font-size: 14px;
+            border-left: 3px solid var(--primary);
+            white-space: pre-wrap;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-val { font-size: 24px; font-weight: 800; color: var(--primary); font-family: 'JetBrains Mono', monospace; }
+        .stat-lab { font-size: 9px; text-transform: uppercase; color: var(--muted); margin-top: 5px; letter-spacing: 1px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { 
+            text-align: left; 
+            font-size: 10px; 
+            text-transform: uppercase; 
+            letter-spacing: 1px; 
+            color: var(--muted);
+            padding: 15px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        td { padding: 15px 10px; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        
+        .severity {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .sev-high { background: rgba(239, 68, 68, 0.15); color: var(--crimson); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .sev-medium { background: rgba(245, 158, 11, 0.15); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+        .sev-low { background: rgba(6, 182, 212, 0.15); color: var(--primary); border: 1px solid var(--border); }
+
+        .footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        @media print {
+            body { padding: 0; background: white; color: black; }
+            .page { box-shadow: none; border: 1px solid #ddd; max-width: 100%; }
+            .watermark { color: rgba(0,0,0,0.05); }
+        }
     </style>
 </head>
 <body>
-    <div class="watermark">CONFIDENTIAL</div>
+    <div class="watermark">SECRET</div>
     <div class="page">
-        <div class="header">
+        <header class="header">
             <div class="logo-section">
                 <h1>CHANAKYA</h1>
-                <p>Digital Forensics & Intelligence Platform</p>
+                <p>Digital Forensics & Intelligence Intelligence</p>
             </div>
-            <div class="meta-section">
-                REPORT ID: FR-${Math.floor(Math.random() * 1000000)}<br>
-                DATE: ${new Date().toLocaleDateString('en-IN')}<br>
-                CLASSIFICATION: SECRET
-            </div>
+            <table class="meta-table">
+                <tr><td>REPORT NO:</td><td class="meta-val">FR-${Math.floor(Date.now()/100000)}</td></tr>
+                <tr><td>DATE:</td><td class="meta-val">${new Date().toLocaleDateString('en-IN')}</td></tr>
+                <tr><td>OP DURATION:</td><td class="meta-val">${daysElapsed} DAYS ELAPSED</td></tr>
+                <tr><td>CLASSIFICATION:</td><td class="meta-val">TOP SECRET // NOFORN</td></tr>
+            </table>
+        </header>
+
+        <div class="doc-title">
+            <h2>Forensic Investigation Summary</h2>
+            <div class="case-name">${caseTitle} // ID: ${caseId}</div>
         </div>
 
-        <div class="doc-title">Forensic Investigation Report</div>
-
-        <div class="section">
-            <div class="section-title">Case Summary</div>
-            <p style="white-space: pre-wrap; font-size: 13px;">${summary || "No executive summary provided."}</p>
-        </div>
-
-        <div class="section">
-            <div class="section-title">Evidence Metadata Statistics</div>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
-                <div class="stat-card"><div class="stat-val">${data.chats.length}</div><div class="stat-lab">Messages</div></div>
-                <div class="stat-card"><div class="stat-val">${data.calls.length}</div><div class="stat-lab">Calls</div></div>
-                <div class="stat-card"><div class="stat-val">${suspiciousItems.length}</div><div class="stat-lab">Threats</div></div>
-                <div class="stat-card"><div class="stat-val">${cryptoWallets.length}</div><div class="stat-lab">Wallets</div></div>
+        <section class="section">
+            <div class="section-header">
+                <h3>Executive Summary</h3>
+                <div class="line"></div>
             </div>
-        </div>
+            <div class="summary-box">${summary || "Investigation summary pending officer entry."}</div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <h3>Operational Intelligence Metrics</h3>
+                <div class="line"></div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-val">${data.chats.length}</div><div class="stat-lab">Processed Msgs</div></div>
+                <div class="stat-card"><div class="stat-val">${suspiciousItems.length}</div><div class="stat-lab">Threats Identified</div></div>
+                <div class="stat-card"><div class="stat-val">${foreignNumbers.length}</div><div class="stat-lab">Foreign Nodes</div></div>
+                <div class="stat-card"><div class="stat-val">${cryptoWallets.length}</div><div class="stat-lab">Financial Links</div></div>
+            </div>
+        </section>
 
         ${suspiciousItems.length > 0 ? `
-        <div class="section">
-            <div class="section-title">High-Value Clues & Red Flags</div>
+        <section class="section">
+            <div class="section-header">
+                <h3>High-Value Targets & Red Flags</h3>
+                <div class="line"></div>
+            </div>
             <table>
                 <thead>
                     <tr>
-                        <th width="15%">Severity</th>
-                        <th width="30%">Entity</th>
-                        <th>Evidence / Proof Description</th>
+                        <th width="15%">Level</th>
+                        <th width="25%">Source Entity</th>
+                        <th>Evidence Narrative / Forensic Proof</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${suspiciousItems.map(item => `
                     <tr>
-                        <td class="severity-${item.severity.toLowerCase()}">${item.severity.toUpperCase()}</td>
-                        <td style="font-family: monospace;">${decryptText((item.record as any).from)}</td>
+                        <td><span class="severity sev-${item.severity.toLowerCase()}">${item.severity}</span></td>
+                        <td style="font-family: 'JetBrains Mono', monospace; font-weight: 700;">${decryptText((item.record as any).from)}</td>
                         <td>
-                            <strong>Proof:</strong> "${decryptText((item.record as any).message)}"<br>
-                            <span style="font-size: 10px; color: #666;">Reason: ${item.reason}</span>
+                            <div style="margin-bottom: 5px; font-style: italic;">"${decryptText((item.record as any).message)}"</div>
+                            <div style="font-size: 10px; color: var(--muted); font-weight: 600;">ANALYST NOTE: ${item.reason}</div>
                         </td>
                     </tr>
                     `).join('')}
                 </tbody>
             </table>
-        </div>
+        </section>
         ` : ''}
 
-        <div class="footer">
-            <div>Chanakya Forensic Intelligence System</div>
-            <div>Generated by Officer ID: SYSTEM_AUTO</div>
-            <div>Page 1 of 1</div>
-        </div>
+        <footer class="footer">
+            <div>Chanakya Forensics v1.0.4 // Cryptographic Sign Verification Pending</div>
+            <div>Generated by Officer ID: ${caseId.slice(0, 8)}</div>
+            <div>Page 01 // EOF</div>
+        </footer>
     </div>
 </body>
 </html>
@@ -202,91 +392,218 @@ export default function ReportPage() {
     try {
       const doc = new jsPDF();
       let y = 20;
-      const lineHeight = 7;
       const margin = 20;
-      const pageWidth = doc.internal.pageSize.getWidth() - margin * 2;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const contentWidth = pageWidth - margin * 2;
 
-      const addLine = (text: string, fontSize = 10, isBold = false) => {
-        if (y > 270) { doc.addPage(); y = 20; }
-        doc.setFontSize(fontSize);
-        doc.setFont("helvetica", isBold ? "bold" : "normal");
-        const lines = doc.splitTextToSize(text, pageWidth);
-        doc.text(lines, margin, y);
-        y += lines.length * lineHeight;
+      // Professional Colors
+      const colorNavy = [2, 6, 23]; // hsl(222, 47%, 5%)
+      const colorCyan = [0, 255, 242]; // Primary
+      const colorMuted = [100, 116, 139]; // Muted text
+      const colorCrimson = [220, 38, 38]; // High severity
+
+      const addWatermark = () => {
+        doc.saveGraphicsState();
+        doc.setTextColor(240, 240, 240);
+        doc.setFontSize(120);
+        doc.setFont("helvetica", "bold");
+        doc.text("SECRET", pageWidth / 2, pageHeight / 2, {
+          align: "center",
+          angle: 45,
+        });
+        doc.restoreGraphicsState();
       };
 
-      // Header
-      doc.setFontSize(18);
+      const addHeader = (pageNum: number) => {
+        // Dark Top Header
+        doc.setFillColor(colorNavy[0], colorNavy[1], colorNavy[2]);
+        doc.rect(0, 0, pageWidth, 40, "F");
+        
+        // Bottom Accent Line
+        doc.setFillColor(colorCyan[0], colorCyan[1], colorCyan[2]);
+        doc.rect(0, 38, pageWidth, 2, "F");
+
+        // Branding
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.text("CHANAKYA", margin, 22);
+        
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(colorCyan[0], colorCyan[1], colorCyan[2]);
+        doc.text("DIGITAL FORENSICS PLATFORM // OPERATIONAL INTELLIGENCE", margin, 28);
+
+        // Metadata on right
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7);
+        doc.text(`REPORT ID: ${caseId.slice(0, 12).toUpperCase()}`, pageWidth - margin, 18, { align: "right" });
+        doc.text(`CLASSIFICATION: TOP SECRET`, pageWidth - margin, 23, { align: "right" });
+        doc.text(`DATE: ${new Date().toLocaleDateString("en-IN")}`, pageWidth - margin, 28, { align: "right" });
+      };
+
+      const addFooter = (pageNum: number) => {
+        doc.setFillColor(colorNavy[0], colorNavy[1], colorNavy[2]);
+        doc.rect(0, pageHeight - 15, pageWidth, 15, "F");
+        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(7);
+        doc.text(`© 2026 CHANAKYA FORENSICS ENGINE // SYSTEM VERIFIED`, margin, pageHeight - 6);
+        doc.text(`PAGE ${pageNum}`, pageWidth - margin, pageHeight - 6, { align: "right" });
+      };
+
+      const checkNewPage = (needed: number) => {
+        if (y + needed > pageHeight - 25) {
+          addFooter(doc.internal.getNumberOfPages());
+          doc.addPage();
+          addWatermark();
+          addHeader(doc.internal.getNumberOfPages());
+          y = 55;
+          return true;
+        }
+        return false;
+      };
+
+      // Start first page
+      addWatermark();
+      addHeader(1);
+      y = 60;
+
+      // Executive Summary
+      doc.setTextColor(colorNavy[0], colorNavy[1], colorNavy[2]);
+      doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text("CHANAKYA — Investigation Report", margin, y);
-      y += 12;
-
-      doc.setFontSize(9);
+      doc.text("I. EXECUTIVE SUMMARY", margin, y);
+      y += 8;
+      
+      doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.text(`Generated: ${new Date().toISOString()}`, margin, y);
-      y += 15;
+      doc.setTextColor(40, 40, 40);
+      const summaryText = summary || "No officer summary provided for this dossier. Intelligence extraction performed automatically.";
+      const splitSummary = doc.splitTextToSize(summaryText, contentWidth);
+      doc.text(splitSummary, margin, y);
+      y += splitSummary.length * 6 + 10;
 
-      // Summary
-      addLine("INVESTIGATION SUMMARY", 14, true);
-      y += 3;
-      addLine(summary || "No summary provided by investigator.", 10);
-      y += 10;
+      // Intelligence Metrics Grid
+      checkNewPage(40);
+      doc.setFillColor(245, 245, 250);
+      doc.rect(margin, y, contentWidth, 25, "F");
+      
+      doc.setTextColor(colorNavy[0], colorNavy[1], colorNavy[2]);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      
+      const colWidth = contentWidth / 4;
+      doc.text("TOTAL CHATS", margin + 10, y + 8);
+      doc.text("FLAGGED ITEMS", margin + colWidth + 10, y + 8);
+      doc.text("FOREIGN ASSETS", margin + colWidth * 2 + 10, y + 8);
+      doc.text("CRYPTO NODES", margin + colWidth * 3 + 10, y + 8);
+      
+      doc.setFontSize(14);
+      doc.setTextColor(colorCyan[0], colorCyan[1], colorCyan[2]);
+      // Use dark cyan for better visibility on light gray
+      doc.setTextColor(0, 150, 140);
+      doc.text(data.chats.length.toString(), margin + 10, y + 18);
+      doc.text(suspiciousItems.length.toString(), margin + colWidth + 10, y + 18);
+      doc.text(foreignNumbers.length.toString(), margin + colWidth * 2 + 18, y + 18);
+      doc.text(cryptoWallets.length.toString(), margin + colWidth * 3 + 18, y + 18);
+      
+      y += 35;
 
-      // Stats
-      addLine("DATA OVERVIEW", 14, true);
-      y += 3;
-      addLine(`Total Records: ${data.rawRecords.length}`);
-      addLine(`Chats: ${data.chats.length} | Calls: ${data.calls.length} | Contacts: ${data.contacts.length} | Images: ${data.images.length}`);
-      addLine(`Suspicious Items: ${suspiciousItems.length}`);
-      addLine(`Foreign Numbers: ${foreignNumbers.length}`);
-      addLine(`Crypto Wallets: ${cryptoWallets.length}`);
-      y += 10;
-
-      // Suspicious chats
+      // Flagged Messages
       if (suspiciousItems.length > 0) {
-        addLine("FLAGGED MESSAGES", 14, true);
-        y += 3;
-        suspiciousItems.slice(0, 15).forEach((item, i) => {
+        checkNewPage(20);
+        doc.setTextColor(colorNavy[0], colorNavy[1], colorNavy[2]);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("II. TARGETED INTELLIGENCE (FLAGGED)", margin, y);
+        y += 8;
+
+        suspiciousItems.slice(0, 20).forEach((item, idx) => {
+          checkNewPage(30);
           const c = item.record as any;
-          addLine(
-            `${i + 1}. [${item.severity.toUpperCase()}] ${decryptText(c.from)} → ${decryptText(c.to)}`,
-            10,
-            true
-          );
-          addLine(`   "${decryptText(c.message)}"`);
-          addLine(`   Reason: ${item.reason}`);
-          y += 3;
+          
+          doc.setFillColor(252, 252, 254);
+          doc.rect(margin, y, contentWidth, 22, "F");
+          doc.setDrawColor(230, 230, 235);
+          doc.rect(margin, y, contentWidth, 22, "S");
+          
+          // Severity Marker
+          const sColor = item.severity === 'high' ? [220, 38, 38] : [245, 158, 11];
+          doc.setFillColor(sColor[0], sColor[1], sColor[2]);
+          doc.rect(margin, y, 4, 22, "F");
+          
+          doc.setTextColor(sColor[0], sColor[1], sColor[2]);
+          doc.setFontSize(7);
+          doc.text(item.severity.toUpperCase(), margin + 8, y + 6);
+          
+          doc.setTextColor(colorNavy[0], colorNavy[1], colorNavy[2]);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.text(`${decryptText(c.from)} → ${decryptText(c.to)}`, margin + 8, y + 11);
+          
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(8);
+          doc.setTextColor(80, 80, 80);
+          const msgText = `"${decryptText(c.message)}"`;
+          const splitMsg = doc.splitTextToSize(msgText, contentWidth - 20);
+          doc.text(splitMsg[0], margin + 8, y + 16);
+          
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(colorMuted[0], colorMuted[1], colorMuted[2]);
+          doc.text(`REASON: ${item.reason}`, margin + 8, y + 20);
+          
+          y += 26;
         });
-        y += 7;
+        y += 5;
       }
 
-      // Foreign numbers
+      // Foreign Numbers
       if (foreignNumbers.length > 0) {
-        addLine("FOREIGN NUMBERS", 14, true);
-        y += 3;
-        foreignNumbers.forEach(num => addLine(`  • ${num}`));
-        y += 7;
+        checkNewPage(30);
+        doc.setTextColor(colorNavy[0], colorNavy[1], colorNavy[2]);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("III. FOREIGN ASSET LIST", margin, y);
+        y += 8;
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        foreignNumbers.forEach((num, i) => {
+          checkNewPage(8);
+          doc.text(`• ${num}`, margin + 5, y);
+          y += 6;
+        });
+        y += 10;
       }
 
-      // Crypto wallets
+      // Crypto Wallets
       if (cryptoWallets.length > 0) {
-        addLine("CRYPTO WALLET ADDRESSES", 14, true);
-        y += 3;
-        cryptoWallets.forEach(w => addLine(`  • ${w}`));
-        y += 7;
+        checkNewPage(30);
+        doc.setTextColor(colorNavy[0], colorNavy[1], colorNavy[2]);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("IV. CRYPTOCURRENCY NODES", margin, y);
+        y += 8;
+        
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        cryptoWallets.forEach((w, i) => {
+          checkNewPage(8);
+          doc.text(`• ${w}`, margin + 5, y);
+          y += 6;
+        });
+        y += 10;
       }
 
-      // Key contacts
-      addLine("KEY CONTACTS", 14, true);
-      y += 3;
-      data.contacts.forEach(c => {
-        addLine(`  • ${c.name} — ${c.phone}${c.organization ? ` (${c.organization})` : ""}`);
-      });
+      // Final Footer
+      addFooter(doc.internal.getNumberOfPages());
 
-      doc.save("forensix-investigation-report.pdf");
-      toast.success("Report downloaded successfully");
+      doc.save(`CHANAKYA_REPORT_${caseId.slice(0, 8).toUpperCase()}_${Date.now()}.pdf`);
+      toast.success("Professional Forensic Report generated");
     } catch (e) {
-      toast.error("Failed to generate report");
+      console.error(e);
+      toast.error("Failed to generate PDF report");
     } finally {
       setGenerating(false);
     }
@@ -314,10 +631,13 @@ export default function ReportPage() {
       {/* ... rest of the existing return ... */}
 
       <div>
-        <h1 className="text-2xl font-bold font-mono text-primary cyber-text-glow flex items-center gap-2">
-          <FileText className="h-6 w-6" /> Generate Report
+        <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow flex items-center gap-3 uppercase">
+          <FileText className="h-6 w-6" />
+          Forensic Report
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Create a downloadable PDF investigation report</p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 opacity-60 font-mono">
+          Create professional downloadable investigation reports with all intelligence artifacts
+        </p>
       </div>
 
       {/* Report Preview */}

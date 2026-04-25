@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Search, Filter, X, Save, Clock, Calendar, Users, MessageSquare, Phone, Image as ImageIcon } from "lucide-react";
+import { Search, Filter, X, Save, Clock, Calendar, Users, MessageSquare, Phone, Image as ImageIcon, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

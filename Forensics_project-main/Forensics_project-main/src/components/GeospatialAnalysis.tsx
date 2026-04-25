@@ -243,8 +243,9 @@ export default function GeospatialAnalysis({
       attribution: "Tiles © Esri",
     },
     dark: {
-      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      attribution: "© OpenStreetMap contributors",
+      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      attribution:
+        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
     },
   };
 
@@ -553,18 +554,23 @@ export default function GeospatialAnalysis({
                     <Circle
                       key={key}
                       center={center}
-                      radius={count * 80}
+                      radius={count * 150} // Increased radius
                       pathOptions={{
                         color,
                         fillColor: color,
-                        fillOpacity: 0.15,
-                        weight: 1.5,
-                        dashArray: "4 2",
+                        fillOpacity: 0.4, // Increased opacity
+                        weight: 2,
+                        dashArray: count > 5 ? "0" : "5 5",
+                        className: "heatmap-pulse" // Added for potential CSS animation
                       }}
                     >
                       <Popup>
-                        <div className="text-center text-sm">
-                          <strong>{count} items</strong> clustered here
+                        <div className="text-center p-1">
+                          <Badge variant="outline" className="mb-1 font-mono text-[10px]">
+                            {count >= 5 ? "🔴 HIGH DENSITY" : "🔵 CLUSTER"}
+                          </Badge>
+                          <p className="text-xs font-bold">{count} Forensic Items</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Approx. Area Coverage</p>
                         </div>
                       </Popup>
                     </Circle>

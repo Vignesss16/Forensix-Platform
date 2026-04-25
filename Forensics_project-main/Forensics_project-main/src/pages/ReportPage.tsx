@@ -90,96 +90,111 @@ export default function ReportPage() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHANAKYA Investigation Report</title>
+    <title>CHANAKYA Intelligence Report - Confidential</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-        .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-        .title { font-size: 24px; font-weight: bold; color: #2563eb; margin-bottom: 10px; }
-        .timestamp { color: #666; font-size: 14px; }
-        .section { margin-bottom: 30px; }
-        .section-title { font-size: 18px; font-weight: bold; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 15px; }
-        .stats { background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .stat-item { display: inline-block; margin-right: 20px; margin-bottom: 10px; }
-        .suspicious-item { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
-        .severity-high { border-left-color: #ef4444; }
-        .severity-medium { border-left-color: #f59e0b; }
-        .severity-low { border-left-color: #10b981; }
-        .crypto-wallet { background: #f0f9ff; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-family: monospace; }
-        .foreign-number { background: #f3f4f6; padding: 8px; margin-bottom: 8px; border-radius: 4px; font-family: monospace; }
+        :root { --primary: #2563eb; --border: #e5e7eb; }
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 40px; color: #1f2937; line-height: 1.6; background: #f9fafb; position: relative; }
+        .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 120px; color: rgba(0,0,0,0.03); font-weight: 900; z-index: -1; pointer-events: none; white-space: nowrap; font-family: sans-serif; }
+        .page { background: white; max-width: 850px; margin: 0 auto; padding: 60px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border-radius: 8px; border: 1px solid var(--border); }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #111; padding-bottom: 25px; margin-bottom: 40px; }
+        .logo-section h1 { font-family: 'JetBrains Mono', monospace; font-size: 28px; margin: 0; letter-spacing: 4px; color: #111; }
+        .logo-section p { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #666; margin: 5px 0 0 0; }
+        .meta-section { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #444; }
+        .doc-title { text-align: center; font-size: 24px; font-weight: 900; text-transform: uppercase; margin: 40px 0; letter-spacing: 2px; border-top: 1px solid #eee; border-bottom: 1px solid #eee; padding: 15px 0; }
+        .section { margin-bottom: 45px; }
+        .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #111; border-left: 4px solid var(--primary); padding-left: 12px; margin-bottom: 20px; }
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+        .stat-card { border: 1px solid #eee; padding: 15px; border-radius: 6px; }
+        .stat-val { font-size: 18px; font-weight: 700; color: var(--primary); }
+        .stat-lab { font-size: 10px; text-transform: uppercase; color: #666; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { text-align: left; background: #f8fafc; border-bottom: 2px solid #eee; padding: 12px 8px; text-transform: uppercase; font-size: 10px; }
+        td { border-bottom: 1px solid #f1f5f9; padding: 12px 8px; vertical-align: top; }
+        .severity-high { color: #ef4444; font-weight: 700; }
+        .footer { margin-top: 60px; border-top: 1px solid #eee; padding-top: 20px; font-size: 10px; color: #999; display: flex; justify-content: space-between; }
+        @media print { body { background: white; padding: 0; } .page { box-shadow: none; border: none; max-width: 100%; } }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="title">CHANAKYA Digital Forensics Report</div>
-        <div class="timestamp">Generated: ${new Date().toLocaleString('en-IN')}</div>
-    </div>
+    <div class="watermark">CONFIDENTIAL</div>
+    <div class="page">
+        <div class="header">
+            <div class="logo-section">
+                <h1>CHANAKYA</h1>
+                <p>Digital Forensics & Intelligence Platform</p>
+            </div>
+            <div class="meta-section">
+                REPORT ID: FR-${Math.floor(Math.random() * 1000000)}<br>
+                DATE: ${new Date().toLocaleDateString('en-IN')}<br>
+                CLASSIFICATION: SECRET
+            </div>
+        </div>
 
-    ${summary ? `
-    <div class="section">
-        <div class="section-title">Executive Summary</div>
-        <p>${summary.replace(/\n/g, '<br>')}</p>
-    </div>
-    ` : ''}
+        <div class="doc-title">Forensic Investigation Report</div>
 
-    <div class="section">
-        <div class="section-title">Investigation Statistics</div>
-        <div class="stats">
-            <div class="stat-item"><strong>Total Records:</strong> ${data.rawRecords.length}</div>
-            <div class="stat-item"><strong>Chats:</strong> ${data.chats.length}</div>
-            <div class="stat-item"><strong>Calls:</strong> ${data.calls.length}</div>
-            <div class="stat-item"><strong>Contacts:</strong> ${data.contacts.length}</div>
-            <div class="stat-item"><strong>Images:</strong> ${data.images.length}</div>
-            <div class="stat-item"><strong>Suspicious Items:</strong> ${suspiciousItems.length}</div>
-            <div class="stat-item"><strong>Foreign Numbers:</strong> ${foreignNumbers.length}</div>
-            <div class="stat-item"><strong>Crypto Wallets:</strong> ${cryptoWallets.length}</div>
+        <div class="section">
+            <div class="section-title">Case Summary</div>
+            <p style="white-space: pre-wrap; font-size: 13px;">${summary || "No executive summary provided."}</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Evidence Metadata Statistics</div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                <div class="stat-card"><div class="stat-val">${data.chats.length}</div><div class="stat-lab">Messages</div></div>
+                <div class="stat-card"><div class="stat-val">${data.calls.length}</div><div class="stat-lab">Calls</div></div>
+                <div class="stat-card"><div class="stat-val">${suspiciousItems.length}</div><div class="stat-lab">Threats</div></div>
+                <div class="stat-card"><div class="stat-val">${cryptoWallets.length}</div><div class="stat-lab">Wallets</div></div>
+            </div>
+        </div>
+
+        ${suspiciousItems.length > 0 ? `
+        <div class="section">
+            <div class="section-title">High-Value Clues & Red Flags</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="15%">Severity</th>
+                        <th width="30%">Entity</th>
+                        <th>Evidence / Proof Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${suspiciousItems.map(item => `
+                    <tr>
+                        <td class="severity-${item.severity.toLowerCase()}">${item.severity.toUpperCase()}</td>
+                        <td style="font-family: monospace;">${decryptText((item.record as any).from)}</td>
+                        <td>
+                            <strong>Proof:</strong> "${decryptText((item.record as any).message)}"<br>
+                            <span style="font-size: 10px; color: #666;">Reason: ${item.reason}</span>
+                        </td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        ` : ''}
+
+        <div class="footer">
+            <div>Chanakya Forensic Intelligence System</div>
+            <div>Generated by Officer ID: SYSTEM_AUTO</div>
+            <div>Page 1 of 1</div>
         </div>
     </div>
-
-    ${suspiciousItems.length > 0 ? `
-    <div class="section">
-        <div class="section-title">Flagged Messages</div>
-        ${suspiciousItems.map(item => {
-            const chat = item.record as any;
-            return `
-            <div class="suspicious-item severity-${item.severity}">
-                <strong>${decryptText(chat.from)} → ${decryptText(chat.to)}</strong><br>
-                <em>${decryptText(chat.message)}</em><br>
-                <small>Reason: ${item.reason} | Severity: ${item.severity.toUpperCase()}</small>
-            </div>
-            `;
-        }).join('')}
-    </div>
-    ` : ''}
-
-    ${foreignNumbers.length > 0 ? `
-    <div class="section">
-        <div class="section-title">Foreign Numbers Detected</div>
-        ${foreignNumbers.map(number => `<div class="foreign-number">${decryptText(number)}</div>`).join('')}
-    </div>
-    ` : ''}
-
-    ${cryptoWallets.length > 0 ? `
-    <div class="section">
-        <div class="section-title">Cryptocurrency Wallets Detected</div>
-        ${cryptoWallets.map(wallet => `<div class="crypto-wallet">${decryptText(wallet)}</div>`).join('')}
-    </div>
-    ` : ''}
-
-    <div class="section">
-        <div class="section-title">Report Footer</div>
-        <p><em>This report was generated by FORENSIX Digital Forensics Platform</em></p>
-    </div>
 </body>
-</html>`;
+</html>
+    `;
 
+    const blob = new Blob([htmlContent], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
     const element = document.createElement("a");
-    element.setAttribute("href", "data:text/html;charset=utf-8," + encodeURIComponent(htmlContent));
-    element.setAttribute("download", `forensix-report-${Date.now()}.html`);
+    element.setAttribute("href", url);
+    element.setAttribute("download", `chanakya_professional_report_${Date.now()}.html`);
     element.style.display = "none";
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
-    toast.success("HTML report exported successfully");
+    toast.success("Professional report exported");
   };
 
   const generatePDF = async () => {

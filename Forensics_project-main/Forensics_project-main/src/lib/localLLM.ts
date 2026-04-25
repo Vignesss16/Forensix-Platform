@@ -10,6 +10,7 @@
  */
 
 import { InvestigationData, ChatRecord } from "./types";
+import { FORENSIC_KNOWLEDGE } from "./forensicKnowledge";
 
 export type LLMStatus = "checking" | "connected" | "offline";
 
@@ -128,104 +129,140 @@ interface Intent {
 const INTENTS: Intent[] = [
   {
     id: "GREETING",
-    primary: ["hello", "hi", "hey", "namaste", "morning", "evening", "howdy", "pranam", "wassup", "sup"],
-    secondary: ["good", "kya", "haal", "ram"],
+    primary: ["hello", "hi", "hey", "namaste", "morning", "evening", "howdy", "pranam", "wassup", "sup", "salaam", "adaab"],
+    secondary: ["good", "kya", "haal", "ram", "kaise", "ho"],
     threshold: 3
   },
   {
     id: "IDENTITY",
-    primary: ["introduce", "chanakya", "name", "yourself"],
-    secondary: ["who", "what", "are", "you", "u", "r"],
+    primary: ["introduce", "chanakya", "name", "yourself", "built", "creator", "developed", "whois"],
+    secondary: ["who", "what", "are", "you", "u", "r", "koun", "kaun"],
     threshold: 3
   },
   {
     id: "HELP",
-    primary: ["help", "capabilities", "features", "commands", "guide", "assist"],
-    secondary: ["what", "how", "me"],
+    primary: ["help", "capabilities", "features", "commands", "guide", "assist", "manual", "tutorial", "instructions"],
+    secondary: ["what", "how", "me", "madat", "helpme"],
     threshold: 3
   },
   {
     id: "CREATE_CASE",
-    primary: ["create", "make", "initialize", "new", "start"],
-    secondary: ["case", "dossier", "investigation", "file"],
-    threshold: 4 // Requires both a verb and a noun
+    primary: ["create", "make", "initialize", "new", "start", "register", "open"],
+    secondary: ["case", "dossier", "investigation", "file", "operation", "mission", "banao", "createcase"],
+    threshold: 4
   },
   {
     id: "GO_DASHBOARD",
-    primary: ["dashboard", "home"],
-    secondary: ["open", "go", "navigate", "main"],
+    primary: ["dashboard", "home", "main", "overview"],
+    secondary: ["open", "go", "navigate", "back", "show", "lelo"],
     threshold: 4
   },
   {
     id: "GO_CASES",
-    primary: ["cases", "dossiers", "management", "hub"],
-    secondary: ["open", "go", "navigate", "all"],
+    primary: ["cases", "dossiers", "management", "hub", "list"],
+    secondary: ["open", "go", "navigate", "all", "view", "dekhao"],
     threshold: 4
   },
   {
     id: "GO_UPLOAD",
-    primary: ["upload", "ufdr", "ingest", "file"],
-    secondary: ["data", "open", "go", "navigate", "put"],
+    primary: ["upload", "ufdr", "ingest", "file", "import", "add"],
+    secondary: ["data", "open", "go", "navigate", "put", "evidence", "daalo"],
     threshold: 4
   },
   {
     id: "SUMMARY",
-    primary: ["summary", "summarize", "summarise", "briefing", "overview", "report", "sumary", "summry", "breifing", "status", "rpt", "happened", "batao", "bolo"],
-    secondary: ["picture", "full", "case", "overall", "what"],
+    primary: ["summary", "summarize", "summarise", "briefing", "overview", "report", "sumary", "summry", "breifing", "status", "rpt", "happened", "batao", "bolo", "conclusion", "gist", "nutshell"],
+    secondary: ["picture", "full", "case", "overall", "what", "complete", "total"],
     threshold: 3
   },
   {
     id: "CRYPTO",
-    primary: ["crypto", "bitcoin", "btc", "wallet", "blockchain", "ethereum", "eth", "monero", "kripto", "bitcion", "waltet", "cryto"],
-    secondary: ["usdt", "transaction", "transfer", "coin", "money", "funds"],
+    primary: ["crypto", "bitcoin", "btc", "wallet", "blockchain", "ethereum", "eth", "monero", "kripto", "bitcion", "waltet", "cryto", "usdt", "tether", "binance", "coinbase", "coldstorage", "seed", "privatekey", "mnemonic", "blockchain"],
+    secondary: ["transaction", "transfer", "coin", "money", "funds", "address", "addressess", "tracing"],
     threshold: 3
   },
   {
     id: "ALERTS",
-    primary: ["suspicious", "flagged", "threat", "danger", "illegal", "redflag", "alert", "sus", "suspcous", "threats", "dangr"],
-    secondary: ["bad", "wrong", "hide", "evidence", "weapon", "drug", "find", "flags"],
+    primary: ["suspicious", "flagged", "threat", "danger", "illegal", "redflag", "alert", "sus", "suspcous", "threats", "dangr", "anomaly", "abnormal", "shak", "gadbad"],
+    secondary: ["bad", "wrong", "hide", "evidence", "weapon", "drug", "find", "flags", "patterns", "risk"],
     threshold: 3
   },
   {
     id: "CALLS",
-    primary: ["call", "calls", "phone", "dial", "ring", "duration", "cal", "cals", "fone", "phon", "dialed", "missed", "incoming", "outgoing", "ringing"],
-    secondary: ["longest", "most"],
+    primary: ["call", "calls", "phone", "dial", "ring", "duration", "cal", "cals", "fone", "phon", "dialed", "missed", "incoming", "outgoing", "ringing", "talked", "conversation", "cdr"],
+    secondary: ["longest", "most", "frequent", "time", "who"],
     threshold: 3
   },
   {
     id: "CONTACTS",
-    primary: ["contacts", "people", "suspects", "network", "relationship", "who", "contcts", "freinds", "netwrk", "associates"],
-    secondary: ["person", "individual", "talks", "with"],
+    primary: ["contacts", "people", "suspects", "network", "relationship", "who", "contcts", "freinds", "netwrk", "associates", "members", "group", "gang", "nexus"],
+    secondary: ["person", "individual", "talks", "with", "known", "identified"],
     threshold: 3
   },
   {
     id: "FOREIGN",
-    primary: ["foreign", "international", "abroad", "overseas", "forign", "internationl"],
-    secondary: ["outside", "country", "number"],
+    primary: ["foreign", "international", "abroad", "overseas", "forign", "internationl", "outside", "country", "global", "dubai", "pakistan", "uae", "canada", "usa", "uk"],
+    secondary: ["number", "calls", "messages", "origin"],
     threshold: 3
   },
   {
     id: "LOCATION",
-    primary: ["where", "location", "gps", "visited", "places", "map", "coordinates", "track", "locaton", "whre", "address", "addres"],
-    secondary: ["went", "been", "area", "region"],
+    primary: ["where", "location", "gps", "visited", "places", "map", "coordinates", "track", "locaton", "whre", "address", "addres", "geofence", "travel", "movements", "destination"],
+    secondary: ["went", "been", "area", "region", "path", "route"],
     threshold: 3
   },
   {
     id: "TIMELINE",
-    primary: ["timeline", "chronology", "sequence", "history", "order", "earliest", "latest", "timline", "seqence", "when", "kab", "first", "last", "recently", "recent"],
-    secondary: ["time", "date", "activity", "events"],
+    primary: ["timeline", "chronology", "sequence", "history", "order", "earliest", "latest", "timline", "seqence", "when", "kab", "first", "last", "recently", "recent", "midnight", "morning", "night", "hour"],
+    secondary: ["time", "date", "activity", "events", "graph"],
     threshold: 3
   },
   {
     id: "MEDIA",
-    primary: ["photos", "images", "videos", "media", "camera", "gallery", "pic", "pics", "picture", "pictures", "foto", "vid", "vids"],
-    secondary: ["file", "files"],
+    primary: ["photos", "images", "videos", "media", "camera", "gallery", "pic", "pics", "picture", "pictures", "foto", "vid", "vids", "screenshot", "selfie", "recording"],
+    secondary: ["file", "files", "exif", "metadata"],
     threshold: 3
   },
   {
     id: "FINANCIAL",
-    primary: ["money", "cash", "bank", "account", "transfer", "transactions", "transaction", "pay", "rupees", "lakh", "crore", "hawala", "financial", "payment", "paisa", "paise", "upi", "gpay", "paytm"],
-    secondary: ["paid", "send", "receive", "mila", "koi", "kuch"],
+    primary: ["money", "cash", "bank", "account", "transfer", "transactions", "transaction", "pay", "rupees", "lakh", "crore", "hawala", "financial", "payment", "paisa", "paise", "upi", "gpay", "paytm", "debit", "credit", "salary", "bribe"],
+    secondary: ["paid", "send", "receive", "mila", "koi", "kuch", "audit"],
+    threshold: 3
+  },
+  {
+    id: "DELETION",
+    primary: ["delete", "deleted", "remove", "erased", "wiped", "missing", "hidden", "trash", "recovery", "recover"],
+    secondary: ["messages", "chats", "logs", "evidence", "vaps", "lao"],
+    threshold: 3
+  },
+  {
+    id: "ENCRYPTION",
+    primary: ["encrypted", "password", "pin", "lock", "hidden", "vault", "secure", "signal", "telegram", "whatsapp", "proton", "pgp", "secret"],
+    secondary: ["chat", "folder", "app", "application", "hide"],
+    threshold: 3
+  },
+  {
+    id: "PROCEDURAL",
+    primary: ["procedure", "legal", "court", "warrant", "subpoena", "evidence", "chain", "custody", "admissible", "arrest", "section", "ipc", "crpc", "bns"],
+    secondary: ["how", "to", "act", "law", "police"],
+    threshold: 3
+  },
+  {
+    id: "BEHAVIORAL",
+    primary: ["mood", "angry", "scared", "fear", "happy", "tense", "stress", "urgency", "immediate", "panic", "lie", "lying", "truth"],
+    secondary: ["tone", "language", "sentiment", "profile"],
+    threshold: 3
+  },
+  {
+    id: "NETWORK_ANALYSIS",
+    primary: ["central", "key", "leader", "boss", "middleman", "bridge", "connected", "degrees", "separation", "fringe"],
+    secondary: ["who", "is", "important", "main", "suspect"],
+    threshold: 3
+  },
+  {
+    id: "TECHNICAL",
+    primary: ["imei", "imsi", "mac", "ip", "address", "os", "version", "model", "serial", "root", "jailbreak", "battery", "storage"],
+    secondary: ["device", "phone", "hardware", "info"],
     threshold: 3
   },
   {
@@ -264,6 +301,7 @@ const INTENTS: Intent[] = [
     secondary: ["tell", "say"],
     threshold: 3
   }
+
 ];
 
 function tokenize(text: string): string[] {
@@ -348,6 +386,19 @@ export function queryFallback(
   if (bestIntent?.id === "GO_CASES") return `[ACTION:GO_CASES]\n\nRouting you to the central dossier management hub.`;
   if (bestIntent?.id === "GO_UPLOAD") return `[ACTION:GO_UPLOAD]\n\nRouting you to the evidence ingestion terminal. You may upload your UFDR files there.`;
 
+  // ── Forensic Knowledge Base Lookup ─────────────────────────────────────────
+  const matchingScenario = FORENSIC_KNOWLEDGE.find(s => 
+    s.keywords.some(k => queryLower.includes(k.toLowerCase()))
+  );
+
+  if (matchingScenario) {
+    let resp = `**[Forensic Knowledge Entry]**\n\n${matchingScenario.response}`;
+    if (!data) {
+      resp += `\n\n💡 *Note: I can also apply this knowledge directly to your evidence once you upload a case file.*`;
+    }
+    return resp;
+  }
+
   if (!data || !data.chats) {
     return "I am unable to answer that because **no forensic evidence has been linked to this case yet.**\n\nPlease go to the **Upload** tab and parse a UFDR file first, so I have data to analyse.";
   }
@@ -365,8 +416,39 @@ export function queryFallback(
 
   // ── Help / Capabilities ────────────────────────────────────────────────────
   if (bestIntent?.id === "HELP") {
-    return `**CHANAKYA — Operational Capabilities**\n\n**🔍 Search & Intelligence**\n- "Find messages about Bitcoin"\n- "Show messages from [number]"\n- "Search for the word 'weapon'"\n\n**🚨 Threat Detection**\n- "Show me suspicious messages"\n- "Find any crypto wallets"\n- "What are the red flags in this case?"\n\n**👤 Suspect Profiling**\n- "Who are the main contacts?"\n- "Who does [number] communicate with most?"\n- "Show foreign/international numbers"\n\n**📅 Timeline Reconstruction**\n- "Give me a timeline of events"\n- "When was there most activity?"\n- "Analyse communication patterns"\n\n**📋 Case Briefing**\n- "Summarise this case"\n- "Give me a full situation report"\n\nState your query in plain language — I will decipher it.`;
+    return `**CHANAKYA — Operational Capabilities**
+
+**🔍 Forensic Search**
+- "Find messages about 'drug' or 'money'"
+- "Search for contacts named 'Rajesh'"
+- "Show me all messages sent at night"
+
+**🚨 Threat & Anomaly Detection**
+- "Show me suspicious messages"
+- "Detect crypto wallet addresses"
+- "Identify high-risk contacts"
+- "Find any mention of 'delete' or 'hide'"
+
+**👤 Network & Behavioral Analysis**
+- "Who is the most central person in this network?"
+- "Map the relationship between [number] and [number]"
+- "Detect panic or urgency in these chats"
+- "Show international connections (Dubai, Pakistan, etc.)"
+
+**📅 Timeline & Location**
+- "Reconstruct the timeline of events"
+- "Where was the suspect at 10 PM?"
+- "Show all media with GPS coordinates"
+- "Identify the most frequent meeting places"
+
+**⚖️ Legal & Procedural**
+- "Is this evidence admissible in court?"
+- "What are the next legal steps for this lead?"
+- "Draft a briefing for my senior officer"
+
+State your query in plain language — I will decipher it.`;
   }
+
 
   // ── Thanks ─────────────────────────────────────────────────────────────────
   if (bestIntent?.id === "THANKS") {

@@ -507,105 +507,117 @@ export default function AIChatPage() {
 
               {/* Case list dropdown */}
               <AnimatePresence>
+        {sidebarOpen && (
+          <motion.aside
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            className="fixed md:relative z-[60] md:z-auto h-full w-[280px] bg-sidebar border-r border-border flex flex-col shadow-2xl md:shadow-none"
+          >
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-[10px] font-black font-mono tracking-[0.2em] text-primary uppercase">Dossier Index</h2>
+              <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 hover:bg-secondary rounded">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            
+            <div className="p-4 bg-black/10">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-mono uppercase text-muted-foreground opacity-50">Active Case</span>
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowCaseSwitcher(!showCaseSwitcher)}>
+                  <GitBranch className="h-3 w-3" />
+                </Button>
+              </div>
+              
+              <AnimatePresence>
                 {showCaseSwitcher && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
+                    className="overflow-hidden mb-4"
                   >
                     <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                      {loadingCases ? (
-                        <div className="space-y-1.5 py-1 px-1">
-                          {[1, 2, 3].map(i => (
-                            <Skeleton key={i} className="h-8 w-full bg-secondary/50 rounded-lg" />
-                          ))}
-                        </div>
-                      ) : (
-                        <>
-                          {allCases.length === 0 ? (
-                            <p className="text-[10px] text-muted-foreground font-mono text-center py-3">No cases found</p>
-                          ) : (
-                            allCases.map((c: any) => {
-                              const cid = c.id || c._id;
-                              const isActive = cid === activeCaseId;
-                              return (
-                                <button
-                                  key={cid}
-                                  onClick={() => { setActiveCaseId(cid); setShowCaseSwitcher(false); toast.success(`Switched to: ${c.title}`); }}
-                                  className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 transition-all ${
-                                    isActive ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-secondary/50 text-muted-foreground border border-transparent'
-                                  }`}
-                                >
-                                  {isActive && <CheckCircle2 className="h-3 w-3 shrink-0" />}
-                                  <span className="text-[10px] font-mono uppercase tracking-tighter truncate">{c.title}</span>
-                                </button>
-                              );
-                            })
-                          )}
-                          <button
-                            onClick={() => { navigate('/cases'); setShowCaseSwitcher(false); }}
-                            className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-primary/70 hover:text-primary border border-dashed border-primary/20 hover:border-primary/40 transition-all font-bold"
-                          >
-                            <Plus className="h-3 w-3" />
-                            <span className="text-[10px] font-mono uppercase tracking-widest">New Case</span>
-                          </button>
-                        </>
-                      )}
+                      {allCases.map((c: any) => (
+                        <button
+                          key={c.id || c._id}
+                          onClick={() => { setActiveCaseId(c.id || c._id); setShowCaseSwitcher(false); }}
+                          className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 transition-all ${
+                            (c.id || c._id) === activeCaseId ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-secondary/50 text-muted-foreground border border-transparent'
+                          }`}
+                        >
+                          <span className="text-[10px] font-mono uppercase truncate">{c.title}</span>
+                        </button>
+                      ))}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               <Button onClick={createConversation} className="w-full justify-start gap-2 cyber-border uppercase text-[10px] tracking-widest font-bold" variant="secondary" size="sm">
-                <Plus className="h-4 w-4" /> New Thread
+                <Plus className="h-4 w-4" /> New Investigation
               </Button>
             </div>
+
             <ScrollArea className="flex-1 px-3 py-4">
-              {loadingHistory ? (
-                <div className="space-y-2 px-1 py-2">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="h-11 rounded-xl bg-secondary/40 animate-pulse" />
-                  ))}
-                </div>
-              ) : conversations.length === 0 ? (
-                <div className="text-center py-20 opacity-20">
-                  <MessageCircle className="h-10 w-10 mx-auto mb-2" />
-                  <p className="text-[10px] uppercase font-mono tracking-widest">No Logs Found</p>
-                </div>
-              ) : null}
               {conversations.map((conv) => (
                 <div key={conv.id} onClick={() => setActiveId(conv.id)} className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer mb-2 transition-all conv-item ${activeId === conv.id ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-secondary/50 border border-transparent"}`}>
-                  <MessageCircle className="h-4 w-4 shrink-0" /><span className="truncate flex-1 font-mono text-[11px] uppercase tracking-tighter">{conv.title}</span>
-                  <button onClick={(e) => deleteConversation(conv.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
+                  <MessageCircle className="h-4 w-4 shrink-0" />
+                  <span className="truncate flex-1 font-mono text-[11px] uppercase tracking-tighter">{conv.title}</span>
+                  <button onClick={(e) => deleteConversation(conv.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-all">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               ))}
             </ScrollArea>
+
             <div className="p-4 border-t border-border bg-black/20">
               <StatusBadge status={llmStatus} />
               <p className="text-[9px] text-muted-foreground mt-2 font-mono uppercase tracking-widest opacity-40">चाणक्य — अर्थशास्त्र</p>
             </div>
           </motion.aside>
         )}
+
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col min-w-0" ref={chatWindowRef}>
-        <div className="shrink-0 border-b border-border px-3 md:px-6 py-3 md:py-5 flex items-center justify-between bg-card/10 backdrop-blur-xl">
-          <div className="flex items-center gap-2 md:gap-5 min-w-0">
-            <button onClick={() => setSidebarOpen((s) => !s)} className="p-2 md:p-2.5 rounded-lg hover:bg-secondary text-muted-foreground transition-colors">
-              <PanelLeft className="h-5 w-5 md:hidden" />
-              <PanelLeft className={`hidden md:block h-5 w-5 transition-transform`} />
+      <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden" ref={chatWindowRef}>
+        {/* Forensic Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none z-0">
+          <div className="text-[15vw] font-black font-mono rotate-[-30deg] uppercase tracking-[0.5em]">Secret Analysis</div>
+        </div>
+
+        <div className="shrink-0 border-b border-border px-3 md:px-6 py-3 md:py-4 flex items-center justify-between bg-card/10 backdrop-blur-xl z-10">
+          <div className="flex items-center gap-2 md:gap-4 min-w-0">
+            <button 
+              onClick={() => setSidebarOpen((s) => !s)} 
+              className="p-2 rounded-lg hover:bg-secondary text-muted-foreground transition-colors md:hidden"
+            >
+              <PanelLeft className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <h1 className="text-xs md:text-sm font-black font-mono tracking-[0.15em] md:tracking-[0.2em] flex items-center gap-2 md:gap-3 text-primary uppercase chat-title">CHANAKYA AI ASSISTANT</h1>
-              <div className="flex items-center gap-2 md:gap-3 mt-1">
-                <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 border-primary/20 bg-primary/5 uppercase tracking-widest leading-none">{data ? "LIVE ANALYTICS" : "HISTORICAL VIEW"}</Badge>
-                <span className="hidden sm:inline text-[10px] text-muted-foreground/50 font-mono tracking-tighter">Forensic Intelligence Engine</span>
+              <h1 className="text-[10px] md:text-xs font-black font-mono tracking-[0.15em] md:tracking-[0.2em] flex items-center gap-2 md:gap-3 text-primary uppercase chat-title">
+                CHANAKYA AI ANALYST
+              </h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-primary/20 bg-primary/5 uppercase tracking-widest h-4">
+                  {data ? "LIVE ANALYTICS" : "HISTORICAL VIEW"}
+                </Badge>
+                <span className="hidden sm:inline text-[9px] text-muted-foreground/40 font-mono uppercase tracking-tighter">SECURE CHANNEL</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {activeConv && <Button variant="ghost" size="sm" onClick={() => {}} className="h-8 px-2 md:px-4 text-[10px] font-bold font-mono gap-1 md:gap-2 uppercase tracking-widest hover:bg-primary/10 text-muted-foreground hover:text-primary"><Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Export Report</span></Button>}
+            {activeConv && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => navigate("/report")} 
+                className="h-8 px-2 md:px-4 text-[9px] font-bold font-mono gap-2 uppercase tracking-widest hover:bg-primary/10 text-muted-foreground hover:text-primary border border-transparent hover:border-primary/20"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Export Analysis</span>
+              </Button>
+            )}
           </div>
         </div>
 

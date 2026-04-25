@@ -14,6 +14,7 @@ import { getCases, createCase, updateCase as updateCaseApi, deleteCase as delete
 import { generateRoadmap } from "@/lib/localLLM";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
+import { InvestigationRoadmap } from "./InvestigationRoadmap";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Case {
@@ -556,12 +557,19 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                         <span className="text-xs font-mono uppercase tracking-widest">Log is empty</span>
                       </div>
                     ) : (
-                      selectedCase.notes.map((note, i) => (
-                        <div key={i} className="p-4 bg-card/50 rounded-xl border border-border/50 relative group">
-                          <span className="absolute top-4 right-4 text-[9px] font-mono text-muted-foreground opacity-50">Log #{i+1}</span>
-                          <p className="text-sm text-foreground/80 leading-relaxed font-mono whitespace-pre-wrap">{note}</p>
-                        </div>
-                      ))
+                      selectedCase.notes.map((note, i) => {
+                        const isRoadmap = note.includes("Based on the UFDR analysis");
+                        return (
+                          <div key={i} className={`p-4 rounded-xl border border-border/50 relative group ${isRoadmap ? 'bg-primary/5 border-primary/20 p-6' : 'bg-card/50'}`}>
+                            <span className="absolute top-4 right-4 text-[9px] font-mono text-muted-foreground opacity-50">Log #{i+1}</span>
+                            {isRoadmap ? (
+                              <InvestigationRoadmap content={note} />
+                            ) : (
+                              <p className="text-sm text-foreground/80 leading-relaxed font-mono whitespace-pre-wrap">{note}</p>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </ScrollArea>

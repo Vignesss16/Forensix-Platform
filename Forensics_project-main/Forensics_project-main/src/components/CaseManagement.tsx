@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FolderOpen, Plus, Edit, Trash2, FileText, Users, Calendar, AlertTriangle, Loader2, Target, ShieldAlert, FileClock, Search, CheckCircle2, Database } from "lucide-react";
+import { FolderOpen, Plus, Edit, Trash2, FileText, Users, Calendar, AlertTriangle, Loader2, Target, ShieldAlert, FileClock, Search, CheckCircle2, Database, GitBranch, BrainCircuit } from "lucide-react";
 import { toast } from "sonner";
 import { getCases, createCase, updateCase as updateCaseApi, deleteCase as deleteCaseApi } from '@/lib/api';
+import { generateRoadmap } from "@/lib/localLLM";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,7 +40,6 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        // Handle both raw array and {data, ts} formats
         const casesArray = Array.isArray(parsed) ? parsed : (parsed.data || []);
         return casesArray.map((c: any) => ({
           ...c,
@@ -52,10 +52,10 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     }
     return [];
   });
-  // If we already have cases from cache, no need to show the full screen loading skeletons
   const [loadingCases, setLoadingCases] = useState(() => cases.length === 0);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const location = useLocation();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -68,7 +68,6 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     notes: []
   });
 
-  // Automatically open the creation dialog if steered here by AI Action Card
   useEffect(() => {
     if (location.state?.openCreateModal) {
       setIsCreateDialogOpen(true);
@@ -76,10 +75,8 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     }
   }, [location.state]);
 
-  // Load cases from MongoDB on mount
   useEffect(() => {
     const fetchCases = async () => {
-      // Only show skeletons if we have nothing to display
       if (cases.length === 0) setLoadingCases(true);
       try {
         const data = await getCases();
@@ -91,7 +88,6 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
         }));
         setCases(formatted);
 
-        // If there's an active case globally, try to select it
         if (activeCaseId) {
           const matched = formatted.find((c: any) => c.id === activeCaseId);
           if (matched) setSelectedCase(matched);
@@ -103,9 +99,8 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
       }
     };
     fetchCases();
-  }, [location.state]); // Removed activeCaseId from dependencies to prevent reloading when selecting a case
+  }, [location.state]);
 
-  // Sync mutations to cache automatically
   useEffect(() => {
     if (cases && cases.length > 0) {
       localStorage.setItem('chanakya-all-cases', JSON.stringify(cases));
@@ -137,7 +132,6 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
       setNewCase({ title: '', description: '', status: 'active', priority: 'medium', tags: [], notes: [] });
       toast.success('Investigation dossier created successfully');
       
-      // Auto-select locally and globally
       setSelectedCase(c);
       setActiveCaseId(c.id);
       setGlobalActiveCase(c);
@@ -189,11 +183,35 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     }
   };
 
+  const handleGenerateRoadmap = async () => {
+    if (!selectedCase) return;
+    if (activeCaseId !== selectedCase.id) {
+      toast.error("Activate Operation First", { description: "You must make this case the Active Op to access its UFDR data for AI analysis."});
+      return;
+    }
+    if (!data || (data.chats.length === 0 && data.calls.length === 0 && data.contacts.length === 0 && data.images.length === 0)) {
+      toast.error("No Evidence Found", { description: "The Active Op has no UFDR data loaded. Cannot generate strategy." });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const roadmap = await generateRoadmap(data);
+      await addNote(selectedCase.id, roadmap);
+      toast.success("Intelligence Strategy Generated", { description: "AI Roadmap added to Field Logs." });
+    } catch (error) {
+      console.error(error);
+      toast.error("Generation Failed");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const setAsActive = (c: Case) => {
     setActiveCaseId(c.id);
     setGlobalActiveCase(c);
     onCaseSelect?.(c);
-    localStorage.removeItem('chanakya-all-cases'); // force refresh in chat
+    localStorage.removeItem('chanakya-all-cases');
     toast.success(`Active operation switched to: ${c.title}`);
   };
 
@@ -516,8 +534,18 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
 
               {/* Field Notes Section */}
               <div className="flex-1 flex flex-col min-h-0 bg-background/30">
-                <div className="px-6 py-3 border-b border-border/50 flex items-center justify-between shrink-0">
+                <div className="px-6 py-3 border-b border-border/50 flex items-center justify-between shrink-0 flex-wrap gap-2">
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] font-bold text-primary/70">Field Intelligence Log</h3>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleGenerateRoadmap}
+                    disabled={isGenerating}
+                    className="h-7 text-[9px] font-mono uppercase tracking-widest border-primary/20 hover:bg-primary/10 text-primary"
+                  >
+                    {isGenerating ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <BrainCircuit className="h-3 w-3 mr-1.5" />}
+                    {isGenerating ? 'Analyzing...' : 'Generate AI Strategy'}
+                  </Button>
                 </div>
                 
                 <ScrollArea className="flex-1 p-4 md:p-6">

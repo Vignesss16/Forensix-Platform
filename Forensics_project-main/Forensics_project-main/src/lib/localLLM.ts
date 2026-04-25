@@ -1054,3 +1054,64 @@ export async function queryLLM(
   const answer = queryFallback(question, data, history);
   await streamFallback(answer, onToken, onDone, signal);
 }
+
+// ─── Automated Investigation Roadmap Generation ────────────────────────────────
+
+export async function generateRoadmap(data: InvestigationData | null): Promise<string> {
+  if (!data) return "No evidence data available to generate a roadmap.";
+
+  let roadmap = "Based on the UFDR analysis, here is the suggested Intelligence Strategy:\n\n";
+
+  // Phase 1: Immediate Leads (Contacts & High-Priority Comms)
+  roadmap += "### Phase 1: Immediate Leads\n";
+  if (data.contacts && data.contacts.length > 0) {
+    const orgContacts = data.contacts.filter(c => c.organization && c.organization !== "None" && c.organization !== "Private");
+    if (orgContacts.length > 0) {
+      roadmap += `- [ ] Investigate linked organizations: **${orgContacts.slice(0, 3).map(c => c.organization).join(", ")}**.\n`;
+      roadmap += `- [ ] Issue subpoenas for contact numbers associated with these entities.\n`;
+    } else {
+      roadmap += `- [ ] Cross-reference the ${data.contacts.length} extracted contacts against criminal databases.\n`;
+    }
+  } else {
+    roadmap += `- [ ] No explicit contacts found. Begin manual number tracing from call logs.\n`;
+  }
+
+  // Phase 2: Digital Trace
+  roadmap += "\n### Phase 2: Digital Trail Analysis\n";
+  if (data.chats && data.chats.length > 0) {
+    const keywords = ["btc", "crypto", "usdt", "hawala", "wallet", "transfer", "cash"];
+    const financialChats = data.chats.filter(c => keywords.some(k => c.message.toLowerCase().includes(k)));
+    if (financialChats.length > 0) {
+      roadmap += `- [ ] **Financial Forensics**: Analyze ${financialChats.length} communications mentioning crypto or hawala transactions.\n`;
+      roadmap += `- [ ] Trace mentioned wallet addresses on the blockchain.\n`;
+    }
+    const signalChats = data.chats.filter(c => c.platform?.toLowerCase() === 'signal' || c.platform?.toLowerCase() === 'telegram');
+    if (signalChats.length > 0) {
+      roadmap += `- [ ] **Encrypted Comms**: Extract devices for deep forensic imaging of Signal/Telegram caches (${signalChats.length} messages found).\n`;
+    } else {
+      roadmap += `- [ ] Review all text messages for covert code words or meeting locations.\n`;
+    }
+  }
+
+  // Phase 3: Communication Networks
+  roadmap += "\n### Phase 3: Communication Networks\n";
+  if (data.calls && data.calls.length > 0) {
+    roadmap += `- [ ] **Call Data Records (CDR)**: Request tower dumps for the timestamps of the ${data.calls.length} extracted call logs.\n`;
+    const internationalCalls = data.calls.filter(c => c.from.startsWith("+") && !c.from.startsWith("+91") && c.to.startsWith("+") && !c.to.startsWith("+91"));
+    if (internationalCalls.length > 0 || data.calls.some(c => c.from.startsWith("+971") || c.to.startsWith("+971") || c.from.startsWith("+49"))) {
+       roadmap += `- [ ] Coordinate with Interpol/Foreign agencies for international numbers detected in logs.\n`;
+    }
+  }
+
+  // Phase 4: Field Operations
+  roadmap += "\n### Phase 4: Field Operations\n";
+  if (data.images && data.images.some(img => img.location)) {
+    const locImages = data.images.filter(img => img.location);
+    roadmap += `- [ ] **Geospatial Raid Planning**: Dispatch reconnaissance to the ${locImages.length} extracted GPS coordinate locations.\n`;
+    roadmap += `- [ ] Seize any additional devices found at coordinates linked to suspicious media (e.g., "${locImages[0]?.filename || 'evidence'}").\n`;
+  } else {
+    roadmap += `- [ ] No GPS data found. Search physical premises associated with suspects.\n`;
+  }
+
+  return roadmap;
+}

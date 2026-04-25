@@ -289,13 +289,13 @@ export default function GeospatialAnalysis({
   }
 
   return (
-    <div className={`flex flex-col gap-4 ${compact ? "" : "h-[calc(100vh-10rem)]"}`}>
+    <div className={`flex flex-col gap-4 ${compact ? "" : "h-[calc(100dvh-12rem)] md:h-[calc(100vh-10rem)]"}`}>
       {/* Stats Strip */}
       {!compact && stats && (
         <motion.div
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-3 gap-3"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
         >
           {[
             { label: "GPS Points", value: stats.total, icon: MapPin },
@@ -394,11 +394,11 @@ export default function GeospatialAnalysis({
 
       {/* Map + Sidebar */}
       <div
-        className={`flex gap-4 ${compact ? "h-full" : "flex-1 min-h-0"}`}
+        className={`flex flex-col md:flex-row gap-4 ${compact ? "h-full" : "flex-1 min-h-0"}`}
       >
         {/* Location List Sidebar */}
         {!compact && (
-          <div className="w-64 shrink-0 flex flex-col border border-border rounded-xl overflow-hidden bg-card">
+          <div className="w-full md:w-64 shrink-0 flex flex-col border border-border rounded-xl overflow-hidden bg-card max-h-[30vh] md:max-h-none">
             <div className="px-3 py-2.5 border-b border-border bg-muted/30">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Locations
@@ -573,22 +573,24 @@ export default function GeospatialAnalysis({
 
               {/* Custom map controls overlay */}
               {!compact && (
-                <MapControls
-                  onZoomIn={() => mapRef.current?.zoomIn()}
-                  onZoomOut={() => mapRef.current?.zoomOut()}
-                  onReset={() => {
-                    setFlyTarget(null);
-                    setActiveLocationId(null);
-                    if (filteredLocations.length > 0) {
-                      const bounds = L.latLngBounds(
-                        filteredLocations.map((l) => l.position)
-                      );
-                      mapRef.current?.fitBounds(bounds, { padding: [40, 40] });
-                    } else {
-                      mapRef.current?.setView([20.5937, 78.9629], 4);
-                    }
-                  }}
-                />
+                <div className="hidden md:block">
+                  <MapControls
+                    onZoomIn={() => mapRef.current?.zoomIn()}
+                    onZoomOut={() => mapRef.current?.zoomOut()}
+                    onReset={() => {
+                      setFlyTarget(null);
+                      setActiveLocationId(null);
+                      if (filteredLocations.length > 0) {
+                        const bounds = L.latLngBounds(
+                          filteredLocations.map((l) => l.position)
+                        );
+                        mapRef.current?.fitBounds(bounds, { padding: [40, 40] });
+                      } else {
+                        mapRef.current?.setView([20.5937, 78.9629], 4);
+                      }
+                    }}
+                  />
+                </div>
               )}
             </MapContainer>
           )}

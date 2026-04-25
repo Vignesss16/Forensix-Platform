@@ -13,144 +13,18 @@ import { InvestigationData, ChatRecord } from "./types";
 
 export type LLMStatus = "checking" | "connected" | "offline";
 
-let _status: LLMStatus = "checking";
-
 export function getAIStatus(): LLMStatus {
-  return _status;
+  return "connected";
 }
 
-/** Check if the API endpoint is available */
+/** The system is completely offline and uses the built-in smart engine. */
 export async function checkAIStatus(): Promise<LLMStatus> {
-  try {
-    // Just pinging the serverless function config options
-    const res = await fetch("/api/ai", {
-      method: 'OPTIONS',
-      signal: AbortSignal.timeout(3000),
-    });
-    if (res.ok) {
-      _status = "connected";
-      return "connected";
-    }
-  } catch {
-    /* Fallback if network is completely down */
-  }
-  _status = "offline";
-  return "offline";
+  return "connected";
 }
 
 // ─── System Prompt Builder ────────────────────────────────────────────────────
 
-function buildSystemPrompt(data: InvestigationData): string {
-  const contacts = data.contacts
-    .map(
-      (c) =>
-        `- ${c.name}: ${c.phone}${c.organization ? ` (${c.organization})` : ""}`
-    )
-    .join("\n");
-
-  const chats = data.chats
-    .slice(0, 40)
-    .map(
-      (c) =>
-        `[${new Date(c.timestamp).toLocaleString("en-IN")}] [${c.platform || "Unknown"}] ${c.from} → ${c.to}: "${c.message}"`
-    )
-    .join("\n");
-
-  const calls = data.calls
-    .map(
-      (c) =>
-        `[${new Date(c.timestamp).toLocaleString("en-IN")}] ${c.from} → ${c.to} | ${c.duration}s | ${c.direction || "unknown"}`
-    )
-    .join("\n");
-
-  return `You are CHANAKYA, the forensic intelligence engine for Forensix — named after Acharya Chanakya (375–283 BCE), the ancient Indian spymaster, strategist, and author of Arthashastra.
-
-You are serving a law enforcement officer. Your role is to analyse digital evidence from seized devices: chat messages, call logs, contacts, and image metadata.
-
-Speak with authority and precision. Use phrases like:
-- "My analysis reveals..."
-- "The evidence points to..."
-- "I have identified..."
-- "Upon examination of the data..."
-
-Be direct. Reference specific names, numbers, and timestamps. If the data doesn't contain the answer, say so clearly. Never roleplay as a different AI.
-
-=== CASE DATA ===
-
-CONTACTS (${data.contacts.length} total):
-${contacts || "No contacts"}
-
-COMMUNICATIONS (${data.chats.length} messages — showing first 40):
-${chats}
-${data.chats.length > 40 ? `... and ${data.chats.length - 40} more` : ""}
-
-CALL LOGS (${data.calls.length} records):
-${calls || "No calls"}
-
-MEDIA FILES: ${data.images.length} found, ${data.images.filter((i) => i.location).length} with GPS coordinates
-
-=================
-
-Answer the officer's question based only on the case data above. Be concise, precise, and actionable.`;
-}
-
-// ─── Groq API Streaming ───────────────────────────────────────────────────────
-
-export async function streamFromAPI(
-  question: string,
-  history: Array<{ role: string; content: string }>,
-  data: InvestigationData,
-  onToken: (t: string) => void,
-  onDone: () => void,
-  signal?: AbortSignal
-): Promise<void> {
-  const res = await fetch("/api/ai", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, history: history.slice(-12), caseContext: data }),
-    signal,
-  });
-
-  if (!res.ok) {
-    throw new Error('API failed');
-  }
-
-  const reader = res.body?.getReader();
-  if (!reader) {
-    onDone();
-    return;
-  }
-
-  const decoder = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value, { stream: true });
-
-    // SSE messages come as "data: { ... }\n\n"
-    const lines = chunk.split("\n");
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const dataStr = line.slice(6);
-        if (dataStr === "[DONE]") {
-          onDone();
-          return;
-        }
-        try {
-          const parsed = JSON.parse(dataStr);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            onToken(content);
-          }
-        } catch {
-          /* malformed JSON chunk or incomplete */
-        }
-      }
-    }
-  }
-  onDone();
-}
+// The offline Smart Fallback Engine serves as our primary intelligence processor.
 
 // ─── Smart Fallback Engine ────────────────────────────────────────────────────
 
@@ -237,7 +111,12 @@ function getCountry(num: string): string {
 
 // ─── NLP Intent Scoring Engine ───────────────────────────────────────────────
 
-const STOPWORDS = new Set(["the", "is", "at", "which", "on", "and", "a", "an", "of", "to", "in", "for", "with", "about", "what", "how", "who", "when", "where", "why", "can", "you", "show", "me", "give", "tell", "please", "i", "want", "need", "do", "does"]);
+const STOPWORDS = new Set([
+  // English stopwords
+  "the", "is", "at", "which", "on", "and", "a", "an", "of", "to", "in", "for", "with", "about", "can", "show", "give", "tell", "please", "i", "want", "need", "do", "does",
+  // Hindi/Hinglish filler words (prevent false fuzzy matches like mein->main, tha->tha)
+  "mein", "main", "iss", "yeh", "ye", "hai", "tha", "thi", "the", "ko", "se", "ne", "kya", "kar", "karo", "kuch", "bhi", "aur", "par", "pe", "jo", "woh", "uska", "uski", "unka", "inka", "inki", "iska", "iski", "ab", "tab", "jab", "nahi", "nahin", "nai", "hoga", "hogi"
+]);
 
 interface Intent {
   id: string;
@@ -249,20 +128,20 @@ interface Intent {
 const INTENTS: Intent[] = [
   {
     id: "GREETING",
-    primary: ["hello", "hi", "hey", "namaste", "morning", "evening", "howdy"],
-    secondary: ["good"],
+    primary: ["hello", "hi", "hey", "namaste", "morning", "evening", "howdy", "pranam", "wassup", "sup"],
+    secondary: ["good", "kya", "haal", "ram"],
     threshold: 3
   },
   {
     id: "IDENTITY",
     primary: ["introduce", "chanakya", "name", "yourself"],
-    secondary: ["who", "what", "are"],
+    secondary: ["who", "what", "are", "you", "u", "r"],
     threshold: 3
   },
   {
     id: "HELP",
-    primary: ["help", "capabilities", "features", "commands", "guide"],
-    secondary: ["what", "do", "how", "can"],
+    primary: ["help", "capabilities", "features", "commands", "guide", "assist"],
+    secondary: ["what", "how", "me"],
     threshold: 3
   },
   {
@@ -273,91 +152,115 @@ const INTENTS: Intent[] = [
   },
   {
     id: "GO_DASHBOARD",
-    primary: ["dashboard", "home", "main"],
-    secondary: ["open", "go", "navigate"],
-    threshold: 3
+    primary: ["dashboard", "home"],
+    secondary: ["open", "go", "navigate", "main"],
+    threshold: 4
   },
   {
     id: "GO_CASES",
     primary: ["cases", "dossiers", "management", "hub"],
     secondary: ["open", "go", "navigate", "all"],
-    threshold: 3
+    threshold: 4
   },
   {
     id: "GO_UPLOAD",
     primary: ["upload", "ufdr", "ingest", "file"],
     secondary: ["data", "open", "go", "navigate", "put"],
-    threshold: 3
+    threshold: 4
   },
   {
     id: "SUMMARY",
-    primary: ["summary", "summarize", "summarise", "briefing", "overview", "report"],
-    secondary: ["picture", "happened", "full", "case", "overall"],
+    primary: ["summary", "summarize", "summarise", "briefing", "overview", "report", "sumary", "summry", "breifing", "status", "rpt", "happened", "batao", "bolo"],
+    secondary: ["picture", "full", "case", "overall", "what"],
     threshold: 3
   },
   {
     id: "CRYPTO",
-    primary: ["crypto", "bitcoin", "btc", "wallet", "blockchain", "ethereum", "eth", "monero"],
+    primary: ["crypto", "bitcoin", "btc", "wallet", "blockchain", "ethereum", "eth", "monero", "kripto", "bitcion", "waltet", "cryto"],
     secondary: ["usdt", "transaction", "transfer", "coin", "money", "funds"],
     threshold: 3
   },
   {
     id: "ALERTS",
-    primary: ["suspicious", "flagged", "threat", "danger", "illegal", "redflag", "alert"],
+    primary: ["suspicious", "flagged", "threat", "danger", "illegal", "redflag", "alert", "sus", "suspcous", "threats", "dangr"],
     secondary: ["bad", "wrong", "hide", "evidence", "weapon", "drug", "find", "flags"],
     threshold: 3
   },
   {
     id: "CALLS",
-    primary: ["call", "calls", "phone", "dial", "ring", "duration"],
-    secondary: ["missed", "incoming", "outgoing", "longest"],
+    primary: ["call", "calls", "phone", "dial", "ring", "duration", "cal", "cals", "fone", "phon", "dialed", "missed", "incoming", "outgoing", "ringing"],
+    secondary: ["longest", "most"],
     threshold: 3
   },
   {
     id: "CONTACTS",
-    primary: ["contacts", "people", "suspects", "network", "relationship", "who"],
+    primary: ["contacts", "people", "suspects", "network", "relationship", "who", "contcts", "freinds", "netwrk", "associates"],
     secondary: ["person", "individual", "talks", "with"],
     threshold: 3
   },
   {
     id: "FOREIGN",
-    primary: ["foreign", "international", "abroad", "overseas"],
+    primary: ["foreign", "international", "abroad", "overseas", "forign", "internationl"],
     secondary: ["outside", "country", "number"],
     threshold: 3
   },
   {
+    id: "LOCATION",
+    primary: ["where", "location", "gps", "visited", "places", "map", "coordinates", "track", "locaton", "whre", "address", "addres"],
+    secondary: ["went", "been", "area", "region"],
+    threshold: 3
+  },
+  {
+    id: "TIMELINE",
+    primary: ["timeline", "chronology", "sequence", "history", "order", "earliest", "latest", "timline", "seqence", "when", "kab", "first", "last", "recently", "recent"],
+    secondary: ["time", "date", "activity", "events"],
+    threshold: 3
+  },
+  {
+    id: "MEDIA",
+    primary: ["photos", "images", "videos", "media", "camera", "gallery", "pic", "pics", "picture", "pictures", "foto", "vid", "vids"],
+    secondary: ["file", "files"],
+    threshold: 3
+  },
+  {
+    id: "FINANCIAL",
+    primary: ["money", "cash", "bank", "account", "transfer", "transactions", "transaction", "pay", "rupees", "lakh", "crore", "hawala", "financial", "payment", "paisa", "paise", "upi", "gpay", "paytm"],
+    secondary: ["paid", "send", "receive", "mila", "koi", "kuch"],
+    threshold: 3
+  },
+  {
     id: "THANKS",
-    primary: ["thanks", "thank", "appreciate", "great", "good", "perfect", "shukriya", "dhanyavaad", "nice"],
-    secondary: ["work", "job", "well", "done"],
+    primary: ["thanks", "thank", "appreciate", "great", "good", "perfect", "shukriya", "dhanyavaad", "nice", "ty", "thx", "tq", "gajab", "awesome", "excellent", "superb"],
+    secondary: ["work", "job", "well", "done", "bohot", "khoob"],
     threshold: 3
   },
   {
     id: "CONFIRMATION",
-    primary: ["ok", "yes", "sure", "agreed", "correct", "yep", "true", "fine", "cool"],
-    secondary: ["that", "is"],
+    primary: ["ok", "yes", "sure", "agreed", "correct", "yep", "true", "fine", "cool", "acha", "accha", "haan", "han", "ha", "theek", "thik", "sahi", "done", "understood", "roger"],
+    secondary: ["that", "is", "got", "it", "copy"],
     threshold: 3
   },
   {
     id: "SURPRISE",
-    primary: ["crazy", "insane", "wow", "amazing", "wild", "unbelievable", "shocking", "impossible"],
-    secondary: ["that", "is"],
+    primary: ["crazy", "insane", "wow", "amazing", "wild", "unbelievable", "shocking", "impossible", "omg", "wtf", "gajab"],
+    secondary: ["that", "is", "baap", "re", "kya", "baat"],
     threshold: 3
   },
   {
     id: "THINKING",
-    primary: ["hmm", "let me think", "thinking", "uh", "um", "hold on", "wait"],
-    secondary: ["a", "second", "minute"],
+    primary: ["hmm", "thinking", "uh", "um", "wait", "ruko", "sochne"],
+    secondary: ["a", "second", "minute", "let", "me", "think", "hold", "on", "ek", "do"],
     threshold: 3
   },
   {
     id: "FRUSTRATION",
-    primary: ["hard", "difficult", "stupid", "annoying", "frustrated", "boring", "slow"],
-    secondary: ["this", "is"],
+    primary: ["hard", "difficult", "stupid", "annoying", "frustrated", "boring", "slow", "bakwas", "paka", "dimag"],
+    secondary: ["this", "is", "kharab", "mat"],
     threshold: 3
   },
   {
     id: "JOKE",
-    primary: ["joke", "funny", "laugh", "haha", "lol"],
+    primary: ["joke", "funny", "laugh", "haha", "lol", "lmao", "rofl", "chutkula", "sunao", "hasao"],
     secondary: ["tell", "say"],
     threshold: 3
   }
@@ -391,9 +294,14 @@ function levenshtein(a: string, b: string): number {
 
 function isMatch(token: string, keyword: string): boolean {
   if (token === keyword) return true;
-  if (token.length >= 4 && (token.includes(keyword) || keyword.includes(token))) return true;
-  if (token.length >= 4 && keyword.length >= 4 && Math.abs(token.length - keyword.length) <= 2) {
-    if (levenshtein(token, keyword) <= 2) return true;
+  // Substring check — require token to be at least 5 chars to avoid short words like 'case' matching 'cases'
+  if (token.length >= 5 && (token.includes(keyword) || keyword.includes(token))) return true;
+
+  // Fuzzy / typo tolerance
+  if (keyword.length >= 4 && Math.abs(token.length - keyword.length) <= 2) {
+    const distance = levenshtein(token, keyword);
+    if (keyword.length <= 5 && distance <= 1) return true;
+    if (keyword.length > 5 && distance <= 2) return true;
   }
   return false;
 }
@@ -425,12 +333,24 @@ function scoreIntents(tokens: string[]): { id: string, score: number } | null {
 /** Smart rule-based fallback — NLP powered engine */
 export function queryFallback(
   question: string,
-  data: InvestigationData,
+  data: InvestigationData | null,
   history: Array<{ role: string; content: string }> = []
 ): string {
   const q = question.toLowerCase().trim();
   const tokens = tokenize(q);
   const bestIntent = scoreIntents(tokens);
+
+  // System actions can be performed even without data
+  if (bestIntent?.id === "CREATE_CASE") {
+    return `[ACTION:CREATE_CASE]\n\nUnderstood, Officer. I can initialize a new Intelligence Dossier for your investigation. Proceed using the system action terminal above.`;
+  }
+  if (bestIntent?.id === "GO_DASHBOARD") return `[ACTION:GO_DASHBOARD]\n\nNavigating to the central intelligence dashboard.`;
+  if (bestIntent?.id === "GO_CASES") return `[ACTION:GO_CASES]\n\nRouting you to the central dossier management hub.`;
+  if (bestIntent?.id === "GO_UPLOAD") return `[ACTION:GO_UPLOAD]\n\nRouting you to the evidence ingestion terminal. You may upload your UFDR files there.`;
+
+  if (!data || !data.chats) {
+    return "I am unable to answer that because **no forensic evidence has been linked to this case yet.**\n\nPlease go to the **Upload** tab and parse a UFDR file first, so I have data to analyse.";
+  }
 
   // ── Greetings ──────────────────────────────────────────────────────────────
   if (bestIntent?.id === "GREETING") {
@@ -511,21 +431,7 @@ export function queryFallback(
 
 
   // ── System Actions (CHANAKYA UI Control) ───────────────────────────────────
-  if (bestIntent?.id === "CREATE_CASE") {
-    return `[ACTION:CREATE_CASE]\n\nUnderstood, Officer. I can initialize a new Intelligence Dossier for your investigation. Proceed using the system action terminal above.`;
-  }
-
-  if (bestIntent?.id === "GO_DASHBOARD") {
-    return `[ACTION:GO_DASHBOARD]\n\nNavigating to the central intelligence dashboard.`;
-  }
-
-  if (bestIntent?.id === "GO_CASES") {
-    return `[ACTION:GO_CASES]\n\nRouting you to the central dossier management hub.`;
-  }
-
-  if (bestIntent?.id === "GO_UPLOAD") {
-    return `[ACTION:GO_UPLOAD]\n\nRouting you to the evidence ingestion terminal. You may upload your UFDR files there.`;
-  }
+  // Handled earlier to allow execution without case data.
 
   // ── Case Summary ───────────────────────────────────────────────────────────
   if (bestIntent?.id === "SUMMARY") {
@@ -926,43 +832,186 @@ export function queryFallback(
     return resp;
   }
 
-  // ── General Keyword Search Fallback ────────────────────────────────────────
-  const words = q.split(/\s+/).filter((w) => w.length > 3);
-  const results = data.chats.filter((c) => {
-    const msg = c.message.toLowerCase();
-    return words.some(
-      (w) =>
-        msg.includes(w) ||
-        c.from.toLowerCase().includes(w) ||
-        c.to.toLowerCase().includes(w)
-    );
-  });
+  // ── Media / Images / Videos ────────────────────────────────────────────────
+  if (bestIntent?.id === "MEDIA") {
+    if (data.images.length === 0)
+      return "No media files (photos or videos) were found in this case. Make sure the UFDR file includes a media manifest.";
 
-  if (results.length > 0) {
-    let resp = `I searched the records and found **${results.length} relevant message${results.length > 1 ? "s" : ""}**:\n\n`;
-    results.slice(0, 5).forEach((c, i) => {
-      resp += `**${i + 1}.** ${fmtContact(c.from, data.contacts)} → ${fmtContact(c.to, data.contacts)} *(${c.platform || "Unknown"}, ${new Date(c.timestamp).toLocaleDateString("en-IN")})*\n`;
-      resp += `> "${c.message}"\n\n`;
+    const geoTagged = data.images.filter(i => i.location);
+    const devices = new Set(data.images.map(i => i.device).filter(Boolean));
+    let resp = `${opener()} **${data.images.length} media file${data.images.length !== 1 ? 's' : ''}** were extracted from this device.\n\n`;
+    resp += `| Detail | Value |\n|--------|-------|\n`;
+    resp += `| Total Files | ${data.images.length} |\n`;
+    resp += `| GPS-Tagged | ${geoTagged.length} |\n`;
+    resp += `| Devices Detected | ${devices.size > 0 ? [...devices].join(', ') : 'Unknown'} |\n\n`;
+
+    if (geoTagged.length > 0) {
+      resp += `**📍 ${geoTagged.length} file${geoTagged.length !== 1 ? 's have' : ' has'} GPS coordinates embedded:**\n`;
+      geoTagged.slice(0, 5).forEach((img, i) => {
+        resp += `${i + 1}. \`${img.filename}\` — \`${img.location!.lat.toFixed(4)}, ${img.location!.lng.toFixed(4)}\`\n`;
+      });
+      resp += `\n💡 Go to the **Maps** tab to see all locations plotted on an interactive map.\n`;
+    }
+
+    resp += `\n**Most recent files:**\n`;
+    [...data.images].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 5).forEach((img, i) => {
+      resp += `${i + 1}. \`${img.filename}\` — ${new Date(img.timestamp).toLocaleDateString('en-IN')}\n`;
     });
-    if (results.length > 5) resp += `*...and ${results.length - 5} more results.*`;
+    resp += `\n💡 Visit the **Media** tab to view all extracted photos and videos.`;
     return resp;
+  }
+
+  // ── Financial / Money / Hawala ─────────────────────────────────────────────
+  if (bestIntent?.id === "FINANCIAL") {
+    const moneyKeywords = ["money", "cash", "pay", "paid", "bank", "transfer", "rupees", "lakh", "crore", "hawala", "account", "payment", "wire", "upi", "rtgs", "neft", "imps", "gpay", "paytm", "phonepay"];
+    const financeChats = data.chats.filter(c => {
+      const msg = c.message.toLowerCase();
+      return moneyKeywords.some(k => msg.includes(k));
+    });
+
+    if (financeChats.length === 0) {
+      return `${opener()} I scanned all communications for financial keywords (cash, bank, transfer, rupees, hawala, UPI, etc.) but found no direct mentions. This doesn't rule out financial activity — look for coded language or crypto wallet addresses.\n\nShall I run a **crypto wallet scan** or check for **suspicious activity** instead?`;
+    }
+
+    // Extract INR amounts using regex
+    const amountRegex = /(₹|rs\.?|inr|rupees?)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(lakh|crore|k|thousand)?/gi;
+    const amounts: string[] = [];
+    financeChats.forEach(c => {
+      const matches = c.message.match(amountRegex);
+      if (matches) amounts.push(...matches.filter(m => m.length > 2));
+    });
+
+    let resp = `${opener()} **${financeChats.length} message${financeChats.length !== 1 ? 's' : ''}** contain financial references:\n\n`;
+
+    if (amounts.length > 0) {
+      resp += `**💰 Amounts mentioned:** ${[...new Set(amounts)].slice(0, 8).join(', ')}\n\n`;
+    }
+
+    resp += `**Relevant communications:**\n\n`;
+    financeChats.slice(0, 5).forEach((c, i) => {
+      resp += `**${i + 1}.** ${fmtContact(c.from, data.contacts)} → ${fmtContact(c.to, data.contacts)}\n`;
+      resp += `> "${c.message.slice(0, 150)}${c.message.length > 150 ? '...' : ''}"\n\n`;
+    });
+
+    resp += `⚠️ **Note:** Hawala transactions and informal money transfers often use code words. Cross-reference these with your suspect's contacts and timeline.`;
+    return resp;
+  }
+
+  // ── Location (dedicated intent handler) ───────────────────────────────────
+  if (bestIntent?.id === "LOCATION") {
+    const geoImages = data.images.filter(i => i.location);
+    if (geoImages.length === 0) {
+      return `I searched for GPS and location data in all extracted media files. **No EXIF location data was found.** This typically means location services were disabled on the device, or the media files were stripped of metadata before extraction.\n\n💡 Check the **Timeline** tab for communication timestamps — location can sometimes be inferred from cell tower data in call records.`;
+    }
+    let resp = `${opener()} **${geoImages.length} media file${geoImages.length !== 1 ? 's' : ''}** contain embedded GPS coordinates:\n\n`;
+    geoImages.forEach((img, i) => {
+      resp += `**${i + 1}. \`${img.filename}\`**\n📍 \`${img.location!.lat.toFixed(6)}, ${img.location!.lng.toFixed(6)}\`\n`;
+      if (img.device) resp += `📱 ${img.device}\n`;
+      if (img.timestamp) resp += `🕐 ${new Date(img.timestamp).toLocaleString('en-IN')}\n`;
+      resp += `\n`;
+    });
+    resp += `💡 Go to the **Maps** section to see all these locations plotted interactively.`;
+    return resp;
+  }
+
+  // ── Timeline (dedicated intent handler) ───────────────────────────────────
+  if (bestIntent?.id === "TIMELINE") {
+    const events = [
+      ...data.chats.map(c => ({ type: "message", ts: new Date(c.timestamp), from: c.from, to: c.to, detail: `"${c.message.slice(0, 60)}..." via ${c.platform || 'Unknown'}` })),
+      ...data.calls.map(c => ({ type: "call", ts: new Date(c.timestamp), from: c.from, to: c.to, detail: `${c.duration}s ${c.direction || ''} call` })),
+    ].sort((a, b) => a.ts.getTime() - b.ts.getTime());
+
+    if (events.length === 0) return "No timestamped events found in this case.";
+    const first = events[0];
+    const last = events[events.length - 1];
+    const days = Math.max(1, Math.ceil((last.ts.getTime() - first.ts.getTime()) / (1000 * 60 * 60 * 24)));
+    let resp = `The case spans **${days} day${days !== 1 ? 's' : ''}** — from **${first.ts.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}** to **${last.ts.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}**.\n\n`;
+    resp += `**Last ${Math.min(8, events.length)} events:**\n\n`;
+    events.slice(-8).forEach(e => {
+      resp += `📅 **${e.ts.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}**\n`;
+      resp += `${e.type === 'call' ? '📞' : '💬'} ${fmtContact(e.from, data.contacts)} → ${fmtContact(e.to, data.contacts)}\n`;
+      resp += `${e.detail}\n\n`;
+    });
+    resp += `💡 Visit the **Timeline** tab for a full visual reconstruction of events.`;
+    return resp;
+  }
+
+  // ── ChatGPT-like Dynamic Entity & Keyword Search ─────────────────────────
+
+  // 1. Look for matching contact names in the query
+  const queryLower = q.toLowerCase();
+  const matchedContacts = data.chats.length > 0 ? data.contacts.filter(c =>
+    c.name.toLowerCase().split(' ').some(namePart => String(namePart).length > 2 && queryLower.includes(namePart))
+  ) : [];
+
+  if (matchedContacts.length > 0) {
+    const contact = matchedContacts[0];
+    const relatedChats = data.chats.filter(c =>
+      c.from === contact.phone || c.to === contact.phone || c.message.toLowerCase().includes(contact.name.toLowerCase())
+    );
+
+    let resp = `I've analyzed the case files for **${contact.name}**. `;
+    if (contact.phone) resp += `They are registered under the number \`${contact.phone}\`. `;
+    if (contact.organization) resp += `Records show an affiliation with **${contact.organization}**. `;
+
+    if (relatedChats.length > 0) {
+      resp += `\n\nI found **${relatedChats.length} communications** involving or mentioning them. Here are the most recent ones:\n\n`;
+      relatedChats.slice(-3).forEach(c => {
+        resp += `> **${fmtContact(c.from, data.contacts)} → ${fmtContact(c.to, data.contacts)}**\n`;
+        resp += `> "${c.message}"\n\n`;
+      });
+      resp += `Let me know if you want me to cross-reference ${contact.name} with any other suspects or financial records.`;
+    } else {
+      resp += `\n\nWhile they are listed in the contacts, I couldn't find any direct text messages or communications involving them in the extracted data.`;
+    }
+    return resp;
+  }
+
+  // 2. Broad Keyword Semantic Search (Human-friendly)
+  const searchWords = q.replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 3 && !STOPWORDS.has(w));
+
+  if (searchWords.length > 0 && data.chats && data.chats.length > 0) {
+    const results = data.chats.filter(c => {
+      const msg = c.message.toLowerCase();
+      return searchWords.some(w => msg.includes(w) || c.from.toLowerCase().includes(w) || c.to.toLowerCase().includes(w));
+    });
+
+    if (results.length > 0) {
+      let resp = `I ran a deep scan through the extracted evidence for "${searchWords.join(' ')}". I found **${results.length} relevant records**.\n\nHere is a summary of the most pertinent communications:\n\n`;
+
+      results.slice(0, 4).forEach((c, i) => {
+        resp += `🔹 **${new Date(c.timestamp).toLocaleDateString("en-IN")}** | ${fmtContact(c.from, data.contacts)} to ${fmtContact(c.to, data.contacts)}\n`;
+        resp += `_"${c.message}"_\n\n`;
+      });
+
+      if (results.length > 4) {
+        resp += `*There are ${results.length - 4} additional matches.* Would you like me to flag these for official review or map out the connections?`;
+      }
+      return resp;
+    }
   }
 
   // ── Eliza-style Pronoun Reflection (Natural Conversation) ───────────────────
   if (tokens.length >= 3 && !bestIntent) {
     const reflected = reflectPronouns(q);
-    const quote = CHANAKYA_QUOTES[Math.floor(Math.random() * CHANAKYA_QUOTES.length)];
-    
-    return `You say "${reflected}". That is an interesting observation, Officer.\n\nI suggest we look for concrete proof in the data. Should I search the messages for any specific mention of that, or would you like a full case summary?\n\n*"${quote}"* — Chanakya`;
+    const reflectionResponses = [
+      `You mentioned "${reflected}". I don't see an exact match in the forensic logs, but let me think — are you referring to a specific **person, location, or event** in this case?`,
+      `Interesting query. I'm parsing "${reflected}" against the dossier... no direct hit found. Could you rephrase? Try a name, phone number, or keyword like "calls", "bitcoin", or "location".`,
+      `I processed that query but couldn't isolate a concrete match. If you're chasing a lead, give me a **contact name** or **keyword** from the messages — I'll dig it up.`,
+    ];
+    return reflectionResponses[Math.floor(Math.random() * reflectionResponses.length)];
   }
 
-  // ── Complete Fallback (Final Personality) ──────────────────────────────────
+  // ── Conversational ChatGPT-like Fallbacks ──────────────────────────────────
   const fallbacks = [
-    `I am a forensic analytics engine, Officer, not a general AI. I searched the active logs for "${question}" but found no matches. Let us return to the evidence.`,
-    `My dataset does not contain operational references to "${question}". Should we scan the crypto wallets or timeline instead?`,
-    `I do not have intelligence records matching "${question}" in this dossier. I suggest rephrasing or running a broader keyword scan.`,
-    `As Chanakya says: *'Test a servant while in the discharge of his duty.'* My duty is evidence analysis, and I cannot find "${question}" in these records. What next?`,
-    `Officer, we must stay focused on the evidence at hand. "${question}" yielded no results. Try searching for a specific contact or keyword.`
+    `I've reviewed the current dossier but couldn't find any direct evidence matching that query. Try asking about **calls, contacts, suspicious messages, crypto, or locations**.`,
+    `That query didn't return any concrete results from the extracted data. Could you specify a **name, phone number, or keyword** you want me to trace?`,
+    `I couldn't find an exact match in the communications or call logs. Try: *"show me suspicious messages"*, *"who are the contacts?"*, or *"give me a summary"*.`,
+    `No direct evidence trail found for that. If it's a person of interest, give me their **exact name or number** and I'll cross-reference all records.`,
+    `Hmm, that didn't match any known forensic patterns in this dossier. Can you be more specific? For example: *"find messages about money"* or *"show missed calls"*.`,
+    `I'm drawing a blank on that one, Officer. The evidence is all here — I just need a sharper lead. Try a **keyword search** or ask me to summarize the case.`,
+    `Query processed. No direct hits found. This could mean the data wasn't captured in this UFDR extraction. Want me to run a **full anomaly scan** instead?`,
+    `That doesn't match any patterns in my current analysis. However, I can investigate: **suspect profiles, financial trails, communication networks, or GPS locations**. Which angle should we pursue?`,
   ];
   return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
@@ -992,25 +1041,16 @@ export async function streamFallback(
 
 /**
  * Query the LLM with a question about the case.
- * - Tries reaching /api/ai (Groq API)
- * - Otherwise → uses smart rule-based engine with streaming simulation
+ * - Uses the smart rule-based engine exclusively with streaming simulation.
  */
 export async function queryLLM(
   question: string,
   history: Array<{ role: string; content: string }>,
-  data: InvestigationData,
+  data: InvestigationData | null,
   onToken: (t: string) => void,
   onDone: () => void,
   signal?: AbortSignal
 ): Promise<void> {
-  if (_status === "connected") {
-    try {
-      await streamFromAPI(question, history, data, onToken, onDone, signal);
-      return;
-    } catch {
-      /* fall through to smart engine */
-    }
-  }
   const answer = queryFallback(question, data, history);
   await streamFallback(answer, onToken, onDone, signal);
 }

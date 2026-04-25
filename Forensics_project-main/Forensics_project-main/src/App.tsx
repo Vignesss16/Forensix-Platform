@@ -37,7 +37,16 @@ const queryClient = new QueryClient({
 
 const App = () => {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem("forensix_user");
+    // Migration bridge: Port over forensix token if chanakya doesn't exist yet
+    let saved = localStorage.getItem("chanakya_user");
+    if (!saved) {
+      saved = localStorage.getItem("forensix_user");
+      if (saved) {
+        localStorage.setItem("chanakya_user", saved);
+        const oldToken = localStorage.getItem("forensix_token");
+        if (oldToken) localStorage.setItem("chanakya_token", oldToken);
+      }
+    }
     return saved ? JSON.parse(saved) : null;
   }); // { role: 'officer' | 'admin', id: string }
 
@@ -48,6 +57,8 @@ const App = () => {
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('chanakya_token');
+    localStorage.removeItem('chanakya_user');
     localStorage.removeItem('forensix_token');
     localStorage.removeItem('forensix_user');
   };
@@ -112,7 +123,7 @@ const App = () => {
     console.error("App render error:", error);
     return (
       <div style={{ padding: '20px', background: '#000', color: '#fff', minHeight: '100vh' }}>
-        <h1 style={{ color: '#ff4444' }}>FORENSIX - App Error</h1>
+        <h1 style={{ color: '#ff4444' }}>CHANAKYA - App Error</h1>
         <p>Failed to render the application:</p>
         <pre style={{ color: '#ffaaaa' }}>{error instanceof Error ? error.message : String(error)}</pre>
       </div>

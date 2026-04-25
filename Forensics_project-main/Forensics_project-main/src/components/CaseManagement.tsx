@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { getCases, createCase, updateCase as updateCaseApi, deleteCase as deleteCaseApi } from '@/lib/api';
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Case {
   id: string;
@@ -34,11 +35,13 @@ interface CaseManagementProps {
 export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
   const { data, setActiveCaseId, setActiveCase: setGlobalActiveCase, activeCaseId } = useInvestigation();
   const [cases, setCases] = useState<Case[]>(() => {
-    const cached = localStorage.getItem('forensix-all-cases');
+    const cached = localStorage.getItem('chanakya-all-cases');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        return parsed.map((c: any) => ({
+        // Handle both raw array and {data, ts} formats
+        const casesArray = Array.isArray(parsed) ? parsed : (parsed.data || []);
+        return casesArray.map((c: any) => ({
           ...c,
           createdAt: new Date(c.createdAt),
           updatedAt: new Date(c.updatedAt),
@@ -49,10 +52,8 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     }
     return [];
   });
-  const [loadingCases, setLoadingCases] = useState(() => {
-    const cached = localStorage.getItem('forensix-all-cases');
-    return !cached;
-  });
+  // If we already have cases from cache, no need to show the full screen loading skeletons
+  const [loadingCases, setLoadingCases] = useState(() => cases.length === 0);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const location = useLocation();
@@ -78,6 +79,8 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
   // Load cases from MongoDB on mount
   useEffect(() => {
     const fetchCases = async () => {
+      // Only show skeletons if we have nothing to display
+      if (cases.length === 0) setLoadingCases(true);
       try {
         const data = await getCases();
         const formatted = data.map((c: any) => ({
@@ -100,12 +103,12 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
       }
     };
     fetchCases();
-  }, [activeCaseId, location.state]);
+  }, [location.state]); // Removed activeCaseId from dependencies to prevent reloading when selecting a case
 
   // Sync mutations to cache automatically
   useEffect(() => {
     if (cases && cases.length > 0) {
-      localStorage.setItem('forensix-all-cases', JSON.stringify(cases));
+      localStorage.setItem('chanakya-all-cases', JSON.stringify(cases));
     }
   }, [cases]);
 
@@ -134,8 +137,10 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
       setNewCase({ title: '', description: '', status: 'active', priority: 'medium', tags: [], notes: [] });
       toast.success('Investigation dossier created successfully');
       
-      // Auto-select
+      // Auto-select locally and globally
       setSelectedCase(c);
+      setActiveCaseId(c.id);
+      setGlobalActiveCase(c);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create case');
     }
@@ -188,7 +193,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     setActiveCaseId(c.id);
     setGlobalActiveCase(c);
     onCaseSelect?.(c);
-    localStorage.removeItem('forensix-all-cases'); // force refresh in chat
+    localStorage.removeItem('chanakya-all-cases'); // force refresh in chat
     toast.success(`Active operation switched to: ${c.title}`);
   };
 
@@ -217,19 +222,19 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
   );
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-4 md:space-y-6 max-w-7xl mx-auto pb-10 px-4 md:px-6 py-4 md:py-6">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
-          <h1 className="text-3xl font-black font-mono tracking-[0.2em] uppercase text-primary mb-1">Intelligence Hub</h1>
-          <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest opacity-60">
+          <h1 className="text-xl md:text-3xl font-black font-mono tracking-[0.15em] md:tracking-[0.2em] uppercase text-primary mb-1">Intelligence Hub</h1>
+          <p className="hidden sm:block text-xs text-muted-foreground font-mono uppercase tracking-widest opacity-60">
             Chanakya Distributed Evidence Network • Central Dossier Management
           </p>
         </div>
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="font-mono uppercase tracking-widest cyber-glow h-10 px-6 font-bold" size="sm">
+            <Button className="font-mono uppercase tracking-[0.2em] cyber-glow h-10 px-6 font-bold" size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Initialize Dossier
             </Button>
@@ -292,13 +297,17 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
         </Dialog>
       </div>
 
-      {/* METRICS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Case Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card/40 border-border/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-lg bg-primary/10 text-primary"><Database className="h-5 w-5" /></div>
-            <div>
-              <p className="text-2xl font-mono font-bold tracking-tighter">{cases.length}</p>
+            <div className="flex-1">
+               {loadingCases ? (
+                  <Skeleton className="h-8 w-16 bg-primary/20" />
+               ) : (
+                 <p className="text-2xl font-mono font-bold tracking-tighter">{cases.length}</p>
+               )}
               <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">Total Dossiers</p>
             </div>
           </CardContent>
@@ -306,8 +315,12 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
         <Card className="bg-card/40 border-border/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-500"><Target className="h-5 w-5" /></div>
-            <div>
-              <p className="text-2xl font-mono font-bold tracking-tighter">{cases.filter(c => c.status === 'active').length}</p>
+            <div className="flex-1">
+               {loadingCases ? (
+                  <Skeleton className="h-8 w-16 bg-emerald-500/20" />
+               ) : (
+                 <p className="text-2xl font-mono font-bold tracking-tighter text-emerald-500">{cases.filter(c => c.status === 'active').length}</p>
+               )}
               <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">Active Operations</p>
             </div>
           </CardContent>
@@ -315,8 +328,12 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
         <Card className="bg-card/40 border-border/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-lg bg-red-500/10 text-red-500"><ShieldAlert className="h-5 w-5" /></div>
-            <div>
-              <p className="text-2xl font-mono font-bold tracking-tighter">{cases.filter(c => c.priority === 'critical' || c.priority === 'high').length}</p>
+            <div className="flex-1">
+               {loadingCases ? (
+                  <Skeleton className="h-8 w-16 bg-red-500/20" />
+               ) : (
+                 <p className="text-2xl font-mono font-bold tracking-tighter text-red-500">{cases.filter(c => c.priority === 'critical' || c.priority === 'high').length}</p>
+               )}
               <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">High Threat Level</p>
             </div>
           </CardContent>
@@ -324,29 +341,36 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
         <Card className="bg-card/40 border-border/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-lg bg-blue-500/10 text-blue-500"><FileClock className="h-5 w-5" /></div>
-            <div>
-              <p className="text-2xl font-mono font-bold tracking-tighter">{cases.filter(c => c.status === 'closed').length}</p>
+            <div className="flex-1">
+               {loadingCases ? (
+                  <Skeleton className="h-8 w-16 bg-blue-500/20" />
+               ) : (
+                 <p className="text-2xl font-mono font-bold tracking-tighter text-blue-500">{cases.filter(c => c.status === 'closed').length}</p>
+               )}
               <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">Closed Cases</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Main Investigation Split View — on mobile: show list OR detail, not both */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 flex-1 min-h-0">
         
-        {/* LEFT PANE: MASTER LIST */}
-        <div className="lg:col-span-4 flex flex-col gap-4 h-[600px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search intelligence index..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 font-mono text-xs uppercase tracking-wider bg-card/50"
-            />
+        {/* Left Pane - Dossier Index: hidden on mobile when a case is selected */}
+        <div className={`lg:col-span-4 flex flex-col min-h-[400px] lg:min-h-0 bg-card/20 rounded-2xl border border-border/50 overflow-hidden backdrop-blur-sm ${selectedCase ? 'hidden lg:flex' : 'flex'}`}>
+          <div className="p-4 border-b border-border">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search intelligence index..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 font-mono text-xs uppercase tracking-wider bg-card/50"
+              />
+            </div>
           </div>
           
-          <div className="flex-1 rounded-xl border border-border bg-card/20 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-hidden flex flex-col">
             <div className="p-3 border-b border-border bg-black/20 flex justify-between items-center shrink-0">
               <span className="text-[10px] font-mono tracking-widest uppercase text-muted-foreground opacity-60">Directory Index</span>
               <span className="text-[10px] font-mono tracking-widest uppercase text-primary">Found: {filteredCases.length}</span>
@@ -354,9 +378,22 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
             <ScrollArea className="flex-1 p-2">
               <AnimatePresence>
                 {loadingCases ? (
-                  <div className="flex flex-col items-center justify-center py-12 opacity-50">
-                    <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest">Decrypting Files...</span>
+                  <div className="space-y-3 px-1 py-1">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="p-3 rounded-lg border border-border/30 bg-muted/5 space-y-2 opacity-50 relative overflow-hidden">
+                        <div className="flex justify-between items-center mb-2">
+                          <Skeleton className="h-4 w-1/2 bg-primary/10" />
+                          <Skeleton className="h-3 w-8 bg-muted/20" />
+                        </div>
+                        <Skeleton className="h-3 w-full bg-muted/5" />
+                        <div className="flex justify-between items-center pt-2">
+                          <Skeleton className="h-2 w-16 bg-primary/5" />
+                          <Skeleton className="h-2 w-12 bg-muted/10" />
+                        </div>
+                        {/* Subtle scanner overlay */}
+                        <div className="absolute inset-x-0 top-0 h-[1px] bg-primary/20 animate-scanline" />
+                      </div>
+                    ))}
                   </div>
                 ) : filteredCases.length === 0 ? (
                   <div className="text-center text-muted-foreground py-12 opacity-50">
@@ -413,24 +450,28 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
           </div>
         </div>
 
-        {/* RIGHT PANE: DOSSIER VIEW */}
-        <div className="lg:col-span-8 h-[600px]">
+        {/* Right Pane - Selected Dossier Intelligence: full width on mobile */}
+        <div className={`lg:col-span-8 bg-card/30 rounded-2xl border border-border/50 flex flex-col min-h-[500px] lg:min-h-0 overflow-hidden relative backdrop-blur-md ${selectedCase ? 'flex' : 'hidden lg:flex'}`}>
           {selectedCase ? (
-            <Card className="h-full flex flex-col bg-card/20 backdrop-blur-xl border border-border shadow-2xl relative overflow-hidden">
+            <div className="h-full flex flex-col relative overflow-hidden">
               {/* Background accent */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
               
-              <div className="p-6 border-b border-border bg-black/10 shrink-0">
-                <div className="flex justify-between items-start mb-4">
+              <div className="p-4 md:p-6 border-b border-border bg-black/10 shrink-0">
+                {/* Mobile back button */}
+                <button onClick={() => setSelectedCase(null)} className="lg:hidden flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:text-primary mb-3 transition-colors">
+                  ← Back to Index
+                </button>
+                <div className="flex justify-between items-start flex-wrap gap-2 mb-4">
                   <div>
                     <Badge className="bg-primary/10 text-primary hover:bg-primary/20 mb-3 text-[9px] uppercase tracking-[0.2em] font-mono border-primary/20">
                       Intelligence Dossier #{selectedCase.id.slice(0,6).toUpperCase()}
                     </Badge>
-                    <h2 className="text-2xl font-black font-mono tracking-widest uppercase text-foreground">
+                    <h2 className="text-lg md:text-2xl font-black font-mono tracking-widest uppercase text-foreground">
                       {selectedCase.title}
                     </h2>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {activeCaseId !== selectedCase.id ? (
                       <Button onClick={() => setAsActive(selectedCase)} className="font-mono text-[10px] uppercase tracking-widest font-bold cyber-border" size="sm">
                          Make Active Op
@@ -453,7 +494,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                   {selectedCase.description}
                 </p>
 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
                   <div className="p-3 bg-card/30 rounded-lg border border-border">
                     <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Status</p>
                     <p className={`font-mono text-xs uppercase font-bold ${getStatusColor(selectedCase.status).split(' ')[1]}`}>{selectedCase.status}</p>
@@ -464,11 +505,11 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                   </div>
                   <div className="p-3 bg-card/30 rounded-lg border border-border">
                     <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Created On</p>
-                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.createdAt.toLocaleString()}</p>
+                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.createdAt.toLocaleString('en-IN')}</p>
                   </div>
                   <div className="p-3 bg-card/30 rounded-lg border border-border">
                     <p className="text-[9px] uppercase font-mono tracking-widest text-muted-foreground mb-1">Last Updated</p>
-                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.updatedAt.toLocaleString()}</p>
+                    <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.updatedAt.toLocaleString('en-IN')}</p>
                   </div>
                 </div>
               </div>
@@ -479,7 +520,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                   <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] font-bold text-primary/70">Field Intelligence Log</h3>
                 </div>
                 
-                <ScrollArea className="flex-1 p-6">
+                <ScrollArea className="flex-1 p-4 md:p-6">
                   <div className="space-y-4">
                     {selectedCase.notes.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 opacity-40">
@@ -497,7 +538,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                   </div>
                 </ScrollArea>
 
-                <div className="p-6 pt-0 shrink-0">
+                <div className="p-4 md:p-6 pt-0 shrink-0">
                   <div className="flex items-start gap-3 bg-black/20 p-3 rounded-xl border border-border">
                     <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-serif text-sm">च</div>
                     <Textarea
@@ -529,7 +570,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                 </div>
               </div>
 
-            </Card>
+            </div>
           ) : (
             <div className="h-full rounded-2xl border border-dashed border-border flex flex-col items-center justify-center bg-card/10 text-center p-10">
               <div className="h-24 w-24 rounded-full bg-primary/5 flex items-center justify-center mb-6 border border-primary/10 shadow-[0_0_50px_rgba(var(--primary-rgb),0.1)]">

@@ -39,7 +39,7 @@ export default function SearchPage() {
             <p className="text-muted-foreground font-mono">No investigation data available.</p>
             <p className="text-xs text-muted-foreground mt-2">Active investigation data is required to perform searches.</p>
           </div>
-          
+
           <div className="flex gap-4">
             <Button onClick={() => navigate("/upload")} className="font-mono gap-2 cyber-glow">
               <Upload className="h-4 w-4" />
@@ -59,26 +59,26 @@ export default function SearchPage() {
         <h2 className="text-lg font-bold">Results ({searchResults.length})</h2>
         {searchResults.slice(0, 50).map((result, idx) => (
           <Card key={idx} className="overflow-hidden">
-             <CardContent className="p-4 flex gap-4 flex-col sm:flex-row">
-               <div className="flex-1">
-                 <div className="flex items-center gap-2 mb-2">
-                   <Badge>{result.type}</Badge>
-                   {('timestamp' in result && result.timestamp) && <span className="text-xs text-muted-foreground">{new Date((result as any).timestamp).toLocaleString()}</span>}
-                 </div>
-                 {result.type === "chat" && (
-                   <div>
-                     <p className="text-sm"><strong>From:</strong> {(result as any).from} <strong>To:</strong> {(result as any).to}</p>
-                     <p className="text-sm mt-1 bg-secondary/30 p-2 rounded">{(result as any).message}</p>
-                   </div>
-                 )}
-                 {result.type === "call" && (
-                   <div>
-                     <p className="text-sm"><strong>From:</strong> {(result as any).from} <strong>To:</strong> {(result as any).to}</p>
-                     <p className="text-sm mt-1">Duration: {(result as any).duration}s | Direction: {(result as any).direction}</p>
-                   </div>
-                 )}
-               </div>
-             </CardContent>
+            <CardContent className="p-4 flex gap-4 flex-col sm:flex-row">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge>{result.type}</Badge>
+                  {('timestamp' in result && result.timestamp) && <span className="text-xs text-muted-foreground">{new Date((result as any).timestamp).toLocaleString()}</span>}
+                </div>
+                {result.type === "chat" && (
+                  <div>
+                    <p className="text-sm"><strong>From:</strong> {(result as any).from} <strong>To:</strong> {(result as any).to}</p>
+                    <p className="text-sm mt-1 bg-secondary/30 p-2 rounded">{(result as any).message}</p>
+                  </div>
+                )}
+                {result.type === "call" && (
+                  <div>
+                    <p className="text-sm"><strong>From:</strong> {(result as any).from} <strong>To:</strong> {(result as any).to}</p>
+                    <p className="text-sm mt-1">Duration: {(result as any).duration}s | Direction: {(result as any).direction}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
           </Card>
         ))}
         {searchResults.length > 50 && (

@@ -1,6 +1,6 @@
 const BASE_URL = '/api';
 // Get token from localStorage
-const getToken = () => localStorage.getItem('forensix_token');
+const getToken = () => localStorage.getItem('chanakya_token');
 
 // Central fetch function — adds JWT header automatically
 const apiFetch = async (endpoint, options = {}) => {

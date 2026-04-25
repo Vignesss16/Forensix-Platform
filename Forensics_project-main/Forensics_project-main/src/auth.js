@@ -12,8 +12,8 @@ export async function authenticate(role, id, password) {
       return { success: false, error: data.error || 'Login failed' };
     }
 
-    localStorage.setItem('forensix_token', data.token);
-    localStorage.setItem('forensix_user', JSON.stringify({
+    localStorage.setItem('chanakya_token', data.token);
+    localStorage.setItem('chanakya_user', JSON.stringify({
       role:  data.role,
       id:    data.userId,
       email: data.email,
@@ -26,6 +26,8 @@ export async function authenticate(role, id, password) {
 }
 
 export function logout() {
-  localStorage.removeItem('forensix_token');
+  localStorage.removeItem('chanakya_token');
+  localStorage.removeItem('chanakya_user');
+  localStorage.removeItem('forensix_token'); // Clear legacy if exists
   localStorage.removeItem('forensix_user');
 }

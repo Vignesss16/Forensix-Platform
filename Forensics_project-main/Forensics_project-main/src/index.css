@@ -7,52 +7,52 @@
 
 @layer base {
   :root {
-    --background: 220 25% 6%;
-    --foreground: 200 20% 90%;
+    --background: 220 28% 3%;
+    --foreground: 200 15% 98%;
 
-    --card: 220 22% 9%;
-    --card-foreground: 200 20% 90%;
+    --card: 220 24% 6%;
+    --card-foreground: 200 15% 96%;
 
-    --popover: 220 22% 9%;
-    --popover-foreground: 200 20% 90%;
+    --popover: 220 24% 6%;
+    --popover-foreground: 200 15% 96%;
 
-    --primary: 185 80% 50%;
-    --primary-foreground: 220 25% 6%;
+    --primary: 185 85% 50%;
+    --primary-foreground: 220 30% 2%;
 
-    --secondary: 220 20% 14%;
-    --secondary-foreground: 200 20% 85%;
+    --secondary: 220 20% 12%;
+    --secondary-foreground: 200 15% 90%;
 
-    --muted: 220 18% 12%;
-    --muted-foreground: 215 15% 50%;
+    --muted: 220 20% 10%;
+    --muted-foreground: 215 15% 75%;
 
-    --accent: 160 70% 45%;
-    --accent-foreground: 220 25% 6%;
+    --accent: 160 80% 45%;
+    --accent-foreground: 220 30% 2%;
 
-    --destructive: 0 75% 55%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 210 40% 98%;
 
-    --warning: 35 90% 55%;
-    --warning-foreground: 220 25% 6%;
+    --warning: 35 95% 55%;
+    --warning-foreground: 220 30% 2%;
 
-    --border: 220 20% 16%;
+    --border: 220 20% 18%;
     --input: 220 20% 14%;
-    --ring: 185 80% 50%;
+    --ring: 185 85% 50%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --cyber-glow: 0 0 20px hsl(185 80% 50% / 0.3);
-    --cyber-glow-strong: 0 0 30px hsl(185 80% 50% / 0.5);
-    --danger-glow: 0 0 20px hsl(0 75% 55% / 0.3);
-    --success-glow: 0 0 20px hsl(160 70% 45% / 0.3);
+    --cyber-glow: 0 0 25px hsl(185 85% 50% / 0.25);
+    --cyber-glow-strong: 0 0 35px hsl(185 85% 50% / 0.45);
+    --danger-glow: 0 0 25px hsl(0 85% 60% / 0.25);
+    --success-glow: 0 0 25px hsl(160 80% 45% / 0.25);
 
-    --sidebar-background: 220 25% 5%;
-    --sidebar-foreground: 200 20% 85%;
-    --sidebar-primary: 185 80% 50%;
-    --sidebar-primary-foreground: 220 25% 6%;
-    --sidebar-accent: 220 20% 12%;
-    --sidebar-accent-foreground: 200 20% 90%;
-    --sidebar-border: 220 20% 14%;
-    --sidebar-ring: 185 80% 50%;
+    --sidebar-background: 220 30% 4%;
+    --sidebar-foreground: 200 15% 90%;
+    --sidebar-primary: 185 85% 50%;
+    --sidebar-primary-foreground: 220 30% 2%;
+    --sidebar-accent: 220 20% 10%;
+    --sidebar-accent-foreground: 200 15% 95%;
+    --sidebar-border: 220 20% 12%;
+    --sidebar-ring: 185 85% 50%;
   }
 }
 
@@ -142,6 +142,31 @@
     animation: ping-slow 3s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 
+  @keyframes cyber-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .skeleton-cyber {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--primary) / 0.1) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: cyber-shimmer 2s infinite linear;
+  }
+
+  @keyframes cyber-pulse-slow {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.3; }
+  }
+
+  .animate-cyber-pulse {
+    animation: cyber-pulse-slow 4s ease-in-out infinite;
+  }
+
   /* Leaflet control positioning fixes */
   .leaflet-control-container .leaflet-control {
     margin-top: 80px !important;
@@ -158,5 +183,66 @@
   /* Ensure map controls don't interfere with page controls */
   .leaflet-control-container {
     z-index: 1 !important;
+  }
+
+  /* ── Dark Map Tile Theme (CSS Filter) ─────────────────────────────────────
+     Applies an invert+hue-rotate to standard OSM tiles to restore the dark
+     forensic aesthetic without needing CartoCDN (which has SSL cert issues).
+     The attribution text is un-inverted so it remains readable.             */
+  .leaflet-tile-pane {
+    filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(85%) saturate(80%);
+  }
+  .leaflet-control-attribution {
+    filter: invert(100%) hue-rotate(180deg);
+  }
+
+  /* ── Mobile Responsive Utilities ─────────────────────────────────────────── */
+
+  /* Prevent content overflow on small screens */
+  @media (max-width: 768px) {
+    /* Make tables horizontally scrollable on mobile */
+    .table-wrapper {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Reduce padding on cards for mobile */
+    .card-mobile {
+      padding: 0.75rem !important;
+    }
+
+    /* Stack grid columns on mobile */
+    .grid-mobile-stack {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Shrink map height on mobile */
+    .map-container {
+      height: 250px !important;
+    }
+
+    /* Full-width buttons on mobile */
+    .btn-mobile-full {
+      width: 100% !important;
+    }
+
+    /* Smaller font for mono IDs on mobile */
+    .mono-id-mobile {
+      font-size: 0.65rem !important;
+    }
+
+    /* Leaflet zoom control position on mobile */
+    .leaflet-top.leaflet-left {
+      top: 10px !important;
+      left: 10px !important;
+    }
+  }
+
+  /* Smooth scrolling on mobile touch */
+  @media (max-width: 768px) {
+    html {
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
   }
 }

@@ -1,0 +1,104 @@
+# CHANAKYA - DIGITAL FORENSICS PLATFORM DIAGRAM PROMPTS
+# Optimized for Eraser.io (Mermaid & Diagram-as-Code)
+
+================================================================================
+DIAGRAM 1: SYSTEM OVERVIEW (High Level)
+================================================================================
+PROMPT: Create a high-level system overview diagram for Chanakya, a digital forensics platform. Show the relationship between Forensic Officers, Seized Devices (UFDR Data), the Chanakya Platform, and the secure evidence storage.
+
+MERMAID CODE:
+graph TD
+    User([Forensic Officer]) --> Platform[Chanakya Platform]
+    Device([Seized Mobile Device]) -- Extraction --> UFDR[UFDR Evidence File]
+    UFDR -- Ingestion --> Platform
+    Platform -- Secure Sync --> DB[(Supabase Cloud Storage)]
+    Platform -- Real-time Analysis --> AI[Local Intelligence Engine]
+    Platform --> Reports[Investigation Dossier / PDF]
+
+    subgraph "Secure Environment"
+        Platform
+        AI
+        DB
+    end
+
+================================================================================
+DIAGRAM 2: SYSTEM ARCHITECTURE (Technical Stack)
+================================================================================
+PROMPT: Create a detailed system architecture diagram for Chanakya. Include a Vite/React Frontend with Framer Motion and GSAP, a Supabase Backend, and a built-in Local NLP/Investigation Engine.
+
+MERMAID CODE:
+graph LR
+    subgraph "Frontend Layer (React + Vite)"
+        UI[User Interface - HSL Cyber Theme]
+        State[Investigation Context API]
+        Anim[Framer Motion / GSAP Actions]
+    end
+
+    subgraph "Intelligence Layer"
+        NLP[Smart Case Engine - localLLM.ts]
+        Rule[Forensic Rule-Set]
+        Streaming[Token Simulation Engine]
+    end
+
+    subgraph "Backend Layer (Serverless)"
+        Auth[Supabase Auth / JWT]
+        Store[Supabase Postgres DB]
+        Bucket[Storage Buckets - UFDR/Media]
+    end
+
+    UI --> State
+    State --> NLP
+    NLP --> Rule
+    Rule --> Streaming
+    Streaming --> UI
+    State --> Auth
+    State --> Store
+    Store --- Bucket
+
+================================================================================
+DIAGRAM 3: EVIDENCE ITINERARY WORKFLOW (Data Processing)
+================================================================================
+PROMPT: Create a workflow diagram showing the "Itinerary Generation" or Evidence Processing sequence. From the moment a UFDR file is uploaded to the generation of the investigative timeline and AI analysis.
+
+MERMAID CODE:
+sequenceDiagram
+    participant O as Forensic Officer
+    participant U as Upload Module
+    participant P as Data Parser (Local)
+    participant S as Supabase Store
+    participant I as Intelligence Engine (Chanakya)
+    participant T as Timeline Generator
+
+    O->>U: Upload UFDR Data
+    U->>P: Extract XML/JSON Records
+    P->>S: Store Structured Evidence (Chats/Calls)
+    S-->>O: Initialize Dossier Success
+    O->>I: Query Investigation Case
+    I->>S: Fetch Linked Context
+    S-->>I: Data Payload
+    I->>I: Identify Patterns/Keywords
+    I->>T: Map Events Chronologically
+    T-->>O: Display Interactive Itinerary/Timeline
+
+================================================================================
+DIAGRAM 4: USER INTERACTION FLOW (The Officer Journey)
+================================================================================
+PROMPT: Create a user interaction flow diagram for a Forensic Officer using Chanakya. Include authentication, dossier creation, evidence ingestion, AI search, and report export.
+
+MERMAID CODE:
+stateDiagram-v2
+    [*] --> Login: Officer Authentication
+    Login --> Dashboard: Access Terminal
+    Dashboard --> CreateCase: Initialize Dossier
+    CreateCase --> Upload: Ingest UFDR Evidence
+    Upload --> InvestigationHub: Data Synchronized
+    
+    state InvestigationHub {
+        [*] --> AISearch: Natural Language Query
+        AISearch --> AnalyzeData: Identify Suspects/Patterns
+        AnalyzeData --> Visualize: Graph/Timeline/Maps
+    }
+    
+    InvestigationHub --> GenerateReport: Compile Findings
+    GenerateReport --> ExportPDF: Legal Documentation
+    ExportPDF --> [*]

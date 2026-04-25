@@ -64,9 +64,10 @@ export default async function handler(req, res) {
   // GET /api/uploads — list all (optionally filtered by caseId)
   if (req.method === 'GET' && !id) {
     try {
+      // ONLY select metadata, do NOT select ufdr_data here or Vercel will crash!
       let query = supabase
         .from('uploads')
-        .select('*')
+        .select('id, case_id, uploaded_by, file_name, file_type, file_size, upload_status, created_at')
         .order('created_at', { ascending: false });
 
       if (req.query.caseId) {

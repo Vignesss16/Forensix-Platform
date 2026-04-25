@@ -4,11 +4,12 @@ import { useNavigate } from "react-router-dom";
 import gsap from "@/lib/gsap-utils";
 import { useGSAP } from "@gsap/react";
 import {
-  Send, Plus, Trash2, Download, Shield, WifiOff, Copy, ChevronRight, Sparkles, MessageCircle, X, FolderOpen, CheckCircle2, ChevronDown
+  Send, Plus, Trash2, Download, Shield, WifiOff, Copy, ChevronRight, Sparkles, MessageCircle, X, FolderOpen, CheckCircle2, ChevronDown, PanelLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
@@ -144,11 +145,12 @@ export default function AIChatPage() {
 
   // ── Case switcher state ──
   const [allCases, setAllCases] = useState<any[]>([]);
+  const [loadingCases, setLoadingCases] = useState(false);
   const [showCaseSwitcher, setShowCaseSwitcher] = useState(false);
 
   // ── Cache keys (stable per case) ──
-  const CACHE_KEY = activeCaseId ? `forensix-conversations-${activeCaseId}` : null;
-  const STATUS_KEY = `forensix-llm-status`;
+  const CACHE_KEY = activeCaseId ? `chanakya-conversations-${activeCaseId}` : null;
+  const STATUS_KEY = `chanakya-llm-status`;
 
 
 
@@ -168,10 +170,10 @@ export default function AIChatPage() {
     } catch { return []; }
   });
 
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(() => {
     if (!activeCaseId || !CACHE_KEY) return null;
-    try { return localStorage.getItem(`forensix-activeconv-${activeCaseId}`) || null; } catch { return null; }
+    try { return localStorage.getItem(`chanakya-activeconv-${activeCaseId}`) || null; } catch { return null; }
   });
   const [input, setInput] = useState("");
   const [llmStatus, setLlmStatus] = useState<LLMStatus>(() => {
@@ -184,7 +186,7 @@ export default function AIChatPage() {
     } catch { return "checking"; }
   });
   const [isStreaming, setIsStreaming] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
 
   // ── Persist conversations to localStorage on every change ──
   useEffect(() => {
@@ -196,8 +198,8 @@ export default function AIChatPage() {
   // ── Persist activeId ──
   useEffect(() => {
     if (activeCaseId && CACHE_KEY) {
-      if (activeId) localStorage.setItem(`forensix-activeconv-${activeCaseId}`, activeId);
-      else localStorage.removeItem(`forensix-activeconv-${activeCaseId}`);
+      if (activeId) localStorage.setItem(`chanakya-activeconv-${activeCaseId}`, activeId);
+      else localStorage.removeItem(`chanakya-activeconv-${activeCaseId}`);
     }
   }, [activeId, activeCaseId, CACHE_KEY]);
 
@@ -229,7 +231,7 @@ export default function AIChatPage() {
     gsap.to(".chat-title", {
       delay: 0.3,
       duration: 1.2,
-      text: "FORENSIX AI ASSISTANT",
+      text: "CHANAKYA AI ASSISTANT",
       ease: "none"
     });
   }, { scope: containerRef }); // mount-only
@@ -277,16 +279,23 @@ export default function AIChatPage() {
   useEffect(() => {
     // Load all cases for the switcher (cached in localStorage for speed)
     const loadCases = async () => {
+      setLoadingCases(true);
       try {
-        const cached = localStorage.getItem('forensix-all-cases');
+        const cached = localStorage.getItem('chanakya-all-cases');
         if (cached) {
           const { data: c, ts } = JSON.parse(cached);
-          if (Date.now() - ts < 120_000) { setAllCases(c); return; }
+          if (Date.now() - ts < 120_000) { 
+            setAllCases(c); 
+            // We still set loading to false here as we have good data
+            setLoadingCases(false);
+            return; 
+          }
         }
         const cases = await getCases();
         setAllCases(cases);
-        localStorage.setItem('forensix-all-cases', JSON.stringify({ data: cases, ts: Date.now() }));
+        localStorage.setItem('chanakya-all-cases', JSON.stringify({ data: cases, ts: Date.now() }));
       } catch { /* silent fail */ }
+      finally { setLoadingCases(false); }
     };
     loadCases();
   }, []);
@@ -432,23 +441,54 @@ export default function AIChatPage() {
         setIsStreaming(false);
         if (activeCaseId && finalContent) saveChat(activeCaseId, 'assistant', finalContent);
       }, abortRef.current.signal);
-    } catch (err) {
+    } catch (err: any) {
       if (flushIntervalRef.current) {
         clearInterval(flushIntervalRef.current);
         flushIntervalRef.current = null;
       }
       console.error("AI Query failed:", err);
+      
+      // Replace the loading message with a clean error message
+      setConversations(prev =>
+        prev.map(c => {
+          if (c.id !== convId) return c;
+          return {
+            ...c,
+            messages: c.messages.map(m =>
+              m.id === assistantId ? { 
+                ...m, 
+                content: `> **SYSTEM WARNING**\n> An error occurred during data analysis. If you have not uploaded forensic evidence yet, please use the **Upload** module to attach a UFDR file to this case.\n\n*Error details: ${err.message}*`, 
+                streaming: false 
+              } : m
+            )
+          };
+        })
+      );
+      
       setIsStreaming(false);
-      toast.error("The AI assistant encountered an error. Please try again.");
+      toast.error("The AI assistant encountered an error.");
     }
   }, [input, activeId, activeConv, isStreaming, data, activeCaseId]);
 
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background" ref={containerRef}>
+    <div className="flex h-[100dvh] overflow-hidden bg-background relative" ref={containerRef}>
+      {/* Mobile Backdrop */}
       <AnimatePresence>
         {sidebarOpen && (
-        <motion.aside initial={{ width: 0, opacity: 0 }} animate={{ width: 288, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="shrink-0 border-r border-border bg-card/20 backdrop-blur-xl flex flex-col overflow-hidden">
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            onClick={() => { if (window.innerWidth < 768) setSidebarOpen(false); }}
+            className="md:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-40" 
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sidebarOpen && (
+        <motion.aside initial={{ width: 0, opacity: 0 }} animate={{ width: 288, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="absolute md:relative z-50 h-full shrink-0 border-r border-border bg-background md:bg-card/20 backdrop-blur-xl flex flex-col overflow-hidden shadow-2xl md:shadow-none">
             {/* CHANAKYA header */}
             <div className="p-4 border-b border-border space-y-3">
               {/* Case switcher */}
@@ -475,32 +515,43 @@ export default function AIChatPage() {
                     className="overflow-hidden"
                   >
                     <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                      {allCases.length === 0 && (
-                        <p className="text-[10px] text-muted-foreground font-mono text-center py-3">No cases found</p>
-                      )}
-                      {allCases.map((c: any) => {
-                        const cid = c.id || c._id;
-                        const isActive = cid === activeCaseId;
-                        return (
+                      {loadingCases ? (
+                        <div className="space-y-1.5 py-1 px-1">
+                          {[1, 2, 3].map(i => (
+                            <Skeleton key={i} className="h-8 w-full bg-secondary/50 rounded-lg" />
+                          ))}
+                        </div>
+                      ) : (
+                        <>
+                          {allCases.length === 0 ? (
+                            <p className="text-[10px] text-muted-foreground font-mono text-center py-3">No cases found</p>
+                          ) : (
+                            allCases.map((c: any) => {
+                              const cid = c.id || c._id;
+                              const isActive = cid === activeCaseId;
+                              return (
+                                <button
+                                  key={cid}
+                                  onClick={() => { setActiveCaseId(cid); setShowCaseSwitcher(false); toast.success(`Switched to: ${c.title}`); }}
+                                  className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 transition-all ${
+                                    isActive ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-secondary/50 text-muted-foreground border border-transparent'
+                                  }`}
+                                >
+                                  {isActive && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                                  <span className="text-[10px] font-mono uppercase tracking-tighter truncate">{c.title}</span>
+                                </button>
+                              );
+                            })
+                          )}
                           <button
-                            key={cid}
-                            onClick={() => { setActiveCaseId(cid); setShowCaseSwitcher(false); toast.success(`Switched to: ${c.title}`); }}
-                            className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 transition-all ${
-                              isActive ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-secondary/50 text-muted-foreground border border-transparent'
-                            }`}
+                            onClick={() => { navigate('/cases'); setShowCaseSwitcher(false); }}
+                            className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-primary/70 hover:text-primary border border-dashed border-primary/20 hover:border-primary/40 transition-all font-bold"
                           >
-                            {isActive && <CheckCircle2 className="h-3 w-3 shrink-0" />}
-                            <span className="text-[10px] font-mono uppercase tracking-tighter truncate">{c.title}</span>
+                            <Plus className="h-3 w-3" />
+                            <span className="text-[10px] font-mono uppercase tracking-widest">New Case</span>
                           </button>
-                        );
-                      })}
-                      <button
-                        onClick={() => { navigate('/cases'); setShowCaseSwitcher(false); }}
-                        className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-primary/70 hover:text-primary border border-dashed border-primary/20 hover:border-primary/40 transition-all"
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span className="text-[10px] font-mono uppercase tracking-widest">New Case</span>
-                      </button>
+                        </>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -539,24 +590,27 @@ export default function AIChatPage() {
       </AnimatePresence>
 
       <div className="flex-1 flex flex-col min-w-0" ref={chatWindowRef}>
-        <div className="shrink-0 border-b border-border px-6 py-5 flex items-center justify-between bg-card/10 backdrop-blur-xl">
-          <div className="flex items-center gap-5">
-            <button onClick={() => setSidebarOpen((s) => !s)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground"><ChevronRight className={`h-5 w-5 transition-transform ${sidebarOpen ? "rotate-180" : ""}`} /></button>
-            <div>
-              <h1 className="text-sm font-black font-mono tracking-[0.2em] flex items-center gap-3 text-primary uppercase chat-title">CHANAKYA</h1>
-              <div className="flex items-center gap-3 mt-1.5">
-                <Badge variant="outline" className="text-[9px] px-2 py-0.5 border-primary/20 bg-primary/5 uppercase tracking-widest leading-none">{data ? "LIVE ANALYTICS" : "HISTORICAL VIEW"}</Badge>
-                <span className="text-[10px] text-muted-foreground/50 font-mono tracking-tighter">Forensic Intelligence Engine</span>
+        <div className="shrink-0 border-b border-border px-3 md:px-6 py-3 md:py-5 flex items-center justify-between bg-card/10 backdrop-blur-xl">
+          <div className="flex items-center gap-2 md:gap-5 min-w-0">
+            <button onClick={() => setSidebarOpen((s) => !s)} className="p-2 md:p-2.5 rounded-lg hover:bg-secondary text-muted-foreground transition-colors">
+              <PanelLeft className="h-5 w-5 md:hidden" />
+              <PanelLeft className={`hidden md:block h-5 w-5 transition-transform`} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-xs md:text-sm font-black font-mono tracking-[0.15em] md:tracking-[0.2em] flex items-center gap-2 md:gap-3 text-primary uppercase chat-title">CHANAKYA AI ASSISTANT</h1>
+              <div className="flex items-center gap-2 md:gap-3 mt-1">
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 border-primary/20 bg-primary/5 uppercase tracking-widest leading-none">{data ? "LIVE ANALYTICS" : "HISTORICAL VIEW"}</Badge>
+                <span className="hidden sm:inline text-[10px] text-muted-foreground/50 font-mono tracking-tighter">Forensic Intelligence Engine</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            {activeConv && <Button variant="ghost" size="sm" onClick={() => {}} className="h-9 px-4 text-[10px] font-bold font-mono gap-2 uppercase tracking-widest hover:bg-primary/10 text-muted-foreground hover:text-primary"><Download className="h-4 w-4" /> Export Report</Button>}
+          <div className="flex items-center gap-2 shrink-0">
+            {activeConv && <Button variant="ghost" size="sm" onClick={() => {}} className="h-8 px-2 md:px-4 text-[10px] font-bold font-mono gap-1 md:gap-2 uppercase tracking-widest hover:bg-primary/10 text-muted-foreground hover:text-primary"><Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Export Report</span></Button>}
           </div>
         </div>
 
-        <ScrollArea className="flex-1 px-8 py-8">
-          {(!data && conversations.length === 0) ? (
+        <ScrollArea className="flex-1 px-3 py-4 md:px-8 md:py-8">
+          {(!activeCaseId && conversations.length === 0) ? (
             <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto text-center py-20 space-y-10" ref={onboardingRef}>
               <div className="relative">
                 <div className="h-28 w-28 rounded-[2.5rem] bg-gradient-to-br from-amber-900/20 to-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_80px_rgba(var(--primary-rgb),0.15)]">
@@ -577,9 +631,9 @@ export default function AIChatPage() {
           ) : (
             <div className="max-w-4xl mx-auto">
               {!activeConv || activeConv.messages.length === 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-12">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 mt-6 md:mt-12">
                   {SUGGESTIONS.map((s) => (
-                    <button key={s.label} onClick={() => handleSend(s.prompt)} className="p-5 rounded-2xl border border-border bg-card/30 hover:border-primary/50 hover:bg-primary/5 transition-all text-left group">
+                    <button key={s.label} onClick={() => handleSend(s.prompt)} className="p-3 md:p-5 rounded-2xl border border-border bg-card/30 hover:border-primary/50 hover:bg-primary/5 transition-all text-left group">
                       <div className="text-lg mb-2">{s.icon}</div>
                       <div className="text-xs font-bold text-primary mb-1 uppercase tracking-widest font-mono">{s.label}</div>
                       <div className="text-[10px] text-muted-foreground opacity-70 group-hover:opacity-100 transition-opacity">{s.prompt}</div>
@@ -593,14 +647,34 @@ export default function AIChatPage() {
           )}
         </ScrollArea>
 
-        <div className="shrink-0 border-t border-border p-6 bg-card/10 backdrop-blur-xl">
-          <div className="max-w-4xl mx-auto flex items-end gap-4 relative">
-            <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder="Input query for investigation analysis..." rows={1} disabled={isStreaming} className="w-full resize-none rounded-2xl border border-border bg-background/50 px-6 py-4 pr-20 text-sm font-mono placeholder:text-muted-foreground/30 focus:ring-2 focus:ring-primary/20 transition-all min-h-[56px] max-h-40 leading-relaxed" />
-            <div className="absolute right-4 bottom-4 flex items-center gap-4">
-               {isStreaming ? <Button onClick={() => abortRef.current?.abort()} size="icon" variant="ghost" className="h-8 w-8 text-destructive"><X className="h-4 w-4" /></Button> : <Button onClick={() => handleSend()} disabled={!input.trim()} size="icon" className="h-10 w-10 rounded-xl"><Send className="h-4 w-4" /></Button>}
+        <div className="shrink-0 pt-2 pb-4 md:pb-6 px-3 md:px-6 bg-background">
+          <div className="max-w-3xl mx-auto relative group">
+            <textarea 
+              ref={textareaRef} 
+              value={input} 
+              onChange={(e) => setInput(e.target.value)} 
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} 
+              placeholder="Message Chanakya..." 
+              rows={1} 
+              disabled={isStreaming} 
+              className="w-full resize-none rounded-[26px] border-0 bg-secondary/60 pl-6 pr-[50px] py-[14px] text-sm md:text-base text-foreground placeholder:text-muted-foreground focus:ring-0 focus:bg-secondary/80 transition-all min-h-[52px] max-h-[200px] leading-relaxed shadow-sm block" 
+            />
+            <div className="absolute right-2 bottom-2 flex items-center justify-center">
+               {isStreaming ? (
+                 <Button onClick={() => abortRef.current?.abort()} size="icon" variant="ghost" className="h-[36px] w-[36px] text-foreground animate-pulse rounded-full hover:bg-secondary"><X className="h-4 w-4" /></Button>
+               ) : (
+                 <Button 
+                   onClick={() => handleSend()} 
+                   disabled={!input.trim()} 
+                   size="icon" 
+                   className={`h-[36px] w-[36px] rounded-full transition-all flex items-center justify-center ${input.trim() ? "bg-foreground text-background hover:bg-foreground/90 shadow-md" : "bg-background text-muted-foreground opacity-60"}`}
+                 >
+                   <Send className="h-4 w-4 translate-x-[-1px] translate-y-[1px]" />
+                 </Button>
+               )}
             </div>
           </div>
-          <p className="text-center text-[9px] text-muted-foreground/40 mt-4 font-mono uppercase tracking-[0.5em]">Chanakya Intelligence Network — Forensix • All data encrypted locally</p>
+          <p className="hidden md:block text-center text-[10px] text-muted-foreground/60 mt-3">Chanakya can make mistakes. Verify important forensic data.</p>
         </div>
       </div>
     </div>

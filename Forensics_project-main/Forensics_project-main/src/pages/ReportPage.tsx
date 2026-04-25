@@ -51,12 +51,36 @@ export default function ReportPage() {
 
     const element = document.createElement("a");
     element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(JSON.stringify(reportData, null, 2)));
-    element.setAttribute("download", `forensix_report_${Date.now()}.json`);
+    element.setAttribute("download", `chanakya_report_${Date.now()}.json`);
     element.style.display = "none";
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
     toast.success("JSON report exported");
+  };
+
+  const exportCSV = () => {
+    const csvContent = [
+      ["Type", "From", "To", "Message/Metadata", "Timestamp", "Reason/Device"],
+      ...suspiciousItems.map(item => {
+        const c = item.record as any;
+        return ["Suspicious Message", c.from, c.to, c.message, c.timestamp, item.reason];
+      }),
+      ...foreignNumbers.map(num => ["Foreign Number", num, "", "", "", ""]),
+      ...cryptoWallets.map(w => ["Crypto Wallet", w, "", "", "", ""]),
+      ...data.contacts.map(c => ["Contact", c.name, c.phone, c.organization || "", "", ""])
+    ]
+      .map(row => row.map(cell => `"${(cell || "").toString().replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const element = document.createElement("a");
+    element.setAttribute("href", "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent));
+    element.setAttribute("download", `chanakya_full_report_${Date.now()}.csv`);
+    element.style.display = "none";
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    toast.success("CSV report exported");
   };
 
   const exportHTML = () => {
@@ -66,7 +90,7 @@ export default function ReportPage() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FORENSIX Investigation Report</title>
+    <title>CHANAKYA Investigation Report</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
         .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
@@ -86,8 +110,8 @@ export default function ReportPage() {
 </head>
 <body>
     <div class="header">
-        <div class="title">FORENSIX Digital Forensics Report</div>
-        <div class="timestamp">Generated: ${new Date().toLocaleString()}</div>
+        <div class="title">CHANAKYA Digital Forensics Report</div>
+        <div class="timestamp">Generated: ${new Date().toLocaleString('en-IN')}</div>
     </div>
 
     ${summary ? `
@@ -179,7 +203,7 @@ export default function ReportPage() {
       // Header
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
-      doc.text("FORENSIX — Investigation Report", margin, y);
+      doc.text("CHANAKYA — Investigation Report", margin, y);
       y += 12;
 
       doc.setFontSize(9);

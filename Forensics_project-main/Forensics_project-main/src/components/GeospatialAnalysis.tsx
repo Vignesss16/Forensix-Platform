@@ -243,8 +243,8 @@ export default function GeospatialAnalysis({
       attribution: "Tiles © Esri",
     },
     dark: {
-      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      attribution: "© OpenStreetMap contributors © CARTO",
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attribution: "© OpenStreetMap contributors",
     },
   };
 

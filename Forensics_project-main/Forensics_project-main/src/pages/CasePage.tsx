@@ -10,7 +10,7 @@ export default function CasePage() {
 
 
   return (
-    <div className="p-6">
+    <div>
       <CaseManagement />
     </div>
   );

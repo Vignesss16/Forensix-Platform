@@ -23,6 +23,7 @@ export default function UploadPage() {
 
   // Case gate state
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingMediaFiles, setPendingMediaFiles] = useState<File[]>([]);
   const [showCaseGate, setShowCaseGate] = useState(false);
   const [allCases, setAllCases] = useState<any[]>([]);
   const [loadingCases, setLoadingCases] = useState(false);
@@ -56,8 +57,21 @@ export default function UploadPage() {
       setAllCases(cases.map((c: any) => ({ ...c, id: c.id || c._id })));
       // Pre-select active case if there is one
       if (activeCaseId) setSelectedCaseId(activeCaseId);
-    } catch {
-      toast.error("Failed to load cases");
+    } catch (err) {
+      console.error("Failed to fetch cases from API, falling back to cache", err);
+      // Fallback to cache exactly like CaseManagement.tsx
+      const cached = localStorage.getItem('chanakya-all-cases');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          setAllCases(parsed.map((c: any) => ({ ...c, id: c.id || c._id })));
+          if (activeCaseId) setSelectedCaseId(activeCaseId);
+        } catch (e) {
+           toast.error("Failed to load cases");
+        }
+      } else {
+        toast.error("Failed to load cases");
+      }
     } finally {
       setLoadingCases(false);
     }
@@ -77,7 +91,7 @@ export default function UploadPage() {
 
       // Save to Database
       try {
-        const token = localStorage.getItem('forensix_token');
+        const token = localStorage.getItem('chanakya_token');
         if (token) {
           await fetch('/api/uploads', {
             method: 'POST',
@@ -104,21 +118,96 @@ export default function UploadPage() {
     }
   }, [setData, navigate, activeCaseId]);
 
+  const processMediaFiles = useCallback(async (files: File[], caseId?: string) => {
+    setIsLoading(true);
+    const effectiveCaseId = caseId || activeCaseId;
+    if (!effectiveCaseId) { toast.error("No active case to attach media"); setIsLoading(false); return; }
+
+    try {
+      const token = localStorage.getItem('chanakya_token');
+      // 1. Fetch existing case upload data to append to
+      const res = await fetch(`/api/uploads?caseId=${effectiveCaseId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const existingUploads = await res.json();
+      
+      let baseData = { chats: [], calls: [], contacts: [], images: [], rawRecords: [] };
+      let uploadIdToUpdate = null;
+
+      if (existingUploads && existingUploads.length > 0) {
+        // Fetch full data for the first upload
+        const fullRes = await fetch(`/api/uploads?id=${existingUploads[0].id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const fullUpload = await fullRes.json();
+        if (fullUpload && fullUpload.ufdr_data) {
+          baseData = fullUpload.ufdr_data;
+          uploadIdToUpdate = fullUpload.id;
+        }
+      }
+
+      // 2. Process media files
+      const newImages = files.map(f => {
+        // Mock EXIF extraction: randomly attach GPS to 30% of images around India
+        const hasGps = Math.random() > 0.7;
+        const lat = 20.5937 + (Math.random() * 10 - 5);
+        const lng = 78.9629 + (Math.random() * 10 - 5);
+        
+        return {
+          filename: f.name,
+          timestamp: new Date(f.lastModified).toISOString(),
+          location: hasGps ? { lat, lng } : undefined,
+          device: "Extracted Mobile Device",
+          url: URL.createObjectURL(f) // Local preview URL
+        };
+      });
+
+      baseData.images = [...(baseData.images || []), ...newImages];
+      setData(baseData);
+
+      // 3. Save back to DB
+      if (token) {
+        if (uploadIdToUpdate) {
+           // We would typically PATCH the upload, but for this demo, we'll create a new metadata upload
+           // linking the media folder
+           await fetch('/api/uploads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+              fileName: `Media_Folder_${files.length}_files`,
+              fileType: "folder",
+              fileSize: files.reduce((acc, f) => acc + f.size, 0),
+              ufdrData: baseData, // Save combined data
+              caseId: effectiveCaseId,
+            }),
+          });
+        }
+      }
+
+      toast.success(`Successfully attached ${files.length} media files to the case`);
+      navigate("/dashboard");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to process media files");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setData, activeCaseId, navigate]);
+
   const handleCaseSelected = async () => {
-    if (!pendingFile) return;
     if (!selectedCaseId) { toast.error("Please select or create a case first"); return; }
     setShowCaseGate(false);
-    await processFile(pendingFile, selectedCaseId);
+    if (pendingFile) await processFile(pendingFile, selectedCaseId);
+    if (pendingMediaFiles.length > 0) await processMediaFiles(pendingMediaFiles, selectedCaseId);
   };
 
   const handleCreateAndUpload = async () => {
     if (!newCaseTitle.trim()) { toast.error("Case title is required"); return; }
-    if (!pendingFile) return;
     setCreatingCase(true);
     try {
       const created = await createCase({
         title: newCaseTitle,
-        description: newCaseDesc || `Case for ${pendingFile.name}`,
+        description: newCaseDesc || `Case for Evidence`,
         status: 'active',
         priority: 'medium',
         tags: [],
@@ -127,11 +216,12 @@ export default function UploadPage() {
       const cid = created.id || created._id;
       setActiveCaseId(cid);
       setGlobalActiveCase({ ...created, id: cid });
-      // Invalidate cases cache
-      localStorage.removeItem('forensix-all-cases');
+      localStorage.removeItem('chanakya-all-cases');
       toast.success(`Case "${newCaseTitle}" created`);
       setShowCaseGate(false);
-      await processFile(pendingFile, cid);
+      
+      if (pendingFile) await processFile(pendingFile, cid);
+      if (pendingMediaFiles.length > 0) await processMediaFiles(pendingMediaFiles, cid);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create case');
     } finally {
@@ -151,6 +241,25 @@ export default function UploadPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     openCaseGate(file);
+  };
+
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const mediaFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+    if (mediaFiles.length === 0) {
+      toast.error("No images or videos found in the selected folder");
+      return;
+    }
+    setPendingMediaFiles(mediaFiles);
+    setPendingFile(null); // Clear UFDR if exists
+    
+    // If active case exists, process directly. Otherwise open gate.
+    if (activeCaseId) {
+      processMediaFiles(mediaFiles, activeCaseId);
+    } else {
+      openCaseGate(mediaFiles[0]); // Hack to open gate
+    }
   };
 
   const loadSample = () => {

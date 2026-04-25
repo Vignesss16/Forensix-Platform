@@ -8,14 +8,16 @@ import {
 import gsap from "@/lib/gsap-utils";
 import { useGSAP } from "@gsap/react";
 import StatCard from "@/components/StatCard";
+import CaseManagement from "@/components/CaseManagement";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 
 // Fix leaflet icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -39,6 +41,18 @@ function makeDotIcon(color: string) {
 const DOT_RED = makeDotIcon("#ef4444");
 const DOT_AMBER = makeDotIcon("#f59e0b");
 const DOT_BLUE = makeDotIcon("#3b82f6");
+
+function MapUpdater() {
+  const map = useMap();
+  useEffect(() => {
+    // Wait for GSAP animations to complete, then force map to calculate exact container size
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [map]);
+  return null;
+}
 
 // ─── Dashboard Mini Map ───────────────────────────────────────────────────────
 function DashboardMiniMap() {
@@ -86,7 +100,11 @@ function DashboardMiniMap() {
       dragging={true}
       attributionControl={false}
     >
-      <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+      <MapUpdater />
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      />
 
       {geoImages.map((img, i) => {
         const key = `${Math.round(img.location!.lat * 10) / 10}_${Math.round(img.location!.lng * 10) / 10}`;
@@ -138,8 +156,10 @@ function FeatureCard({
   to?: string; icon: any; title: string; description: string; badge?: string;
 }) {
   const inner = (
-    <Card className="hover:shadow-md transition-all cursor-pointer cyber-border group hover:border-primary/30 h-full feature-card opacity-0">
-      <CardHeader className="pb-2">
+    <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer cyber-border group hover:border-primary/50 h-full feature-card opacity-0 relative overflow-hidden bg-gradient-to-br from-card to-card/50">
+      <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute -inset-1 bg-gradient-to-r from-primary/0 via-primary/10 to-primary/0 translate-x-[-100%] group-hover:animate-shimmer" />
+      <CardHeader className="pb-2 relative z-10">
         <CardTitle className="flex items-center justify-between text-sm">
           <span className="flex items-center gap-2">
             <Icon className="h-4 w-4 text-primary" />
@@ -163,10 +183,11 @@ function FeatureCard({
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { data, suspiciousItems, foreignNumbers, cryptoWallets } = useInvestigation();
+  const { data, suspiciousItems, foreignNumbers, cryptoWallets, isLoadingCaseData, activeCaseId } = useInvestigation();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
+    if (!containerRef.current || (!activeCaseId && !data)) return;
     const tl = gsap.timeline();
     
     // Smooth container entrance — fromTo so it never gets stuck at 0
@@ -209,16 +230,28 @@ export default function DashboardPage() {
 
     // Map and Flagged messages section entrance
     tl.from(".dashboard-grid-section", {
-      y: 30,
+      scale: 0.98,
+      y: 40,
       opacity: 0,
       duration: 0.8,
       ease: "power3.out"
     }, "-=0.5");
+    
+    // Continuous subtle floating for alert card
+    gsap.to(".alert-card", {
+      y: -4,
+      duration: 2,
+      yoyo: true,
+      repeat: -1,
+      ease: "sine.inOut",
+      delay: 2
+    });
 
   }, { scope: containerRef, dependencies: [] }); // entrance runs ONCE only
 
   // Separate effect for "Counting up" the stats — only re-runs when data changes
   useGSAP(() => {
+    if (!containerRef.current || (!activeCaseId && !data)) return;
     if (data) {
       gsap.utils.toArray(".stat-value").forEach((el: any) => {
         const endVal = parseInt(el.getAttribute("data-value") || "0");
@@ -235,7 +268,7 @@ export default function DashboardPage() {
         });
       });
     }
-  }, { scope: containerRef, dependencies: [data] });
+  }, { scope: containerRef, dependencies: [data, isLoadingCaseData] });
 
   // ── Derived values — memoized so they don't recompute on unrelated renders
   const highSeverity = useMemo(
@@ -251,45 +284,53 @@ export default function DashboardPage() {
     [data]
   );
 
+  // If no active case AND no data is loaded, render the Intelligent Hub so the officer can select/create one
+  if (!activeCaseId && !data) {
+    return (
+      <div className="animate-in fade-in duration-500">
+        <CaseManagement />
+      </div>
+    );
+  }
+
   return (
-    <div className="p-5 space-y-6 dashboard-container" ref={containerRef}>
+    <div className="space-y-4 md:space-y-6 dashboard-container px-4 md:px-6 py-4 md:py-6" ref={containerRef}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start md:items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-xl font-bold font-mono text-primary cyber-text-glow dashboard-title">
+          <h1 className="text-base md:text-xl font-bold font-mono text-primary cyber-text-glow dashboard-title">
             Investigation Dashboard
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
             {data ? `${data.rawRecords.length} forensic records analysed` : "Waiting for forensic data upload..."}
           </p>
-
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {highSeverity > 0 && (
-            <Badge variant="destructive" className="gap-1">
+            <Badge variant="destructive" className="gap-1 text-[10px]">
               <AlertTriangle className="h-3 w-3" />
-              {highSeverity} high-severity
+              {highSeverity} high
             </Badge>
           )}
-          <Badge variant="outline" className="font-mono text-xs gap-1">
+          <Badge variant="outline" className="font-mono text-[10px] gap-1">
             <Shield className="h-3 w-3" />
-            CASE ACTIVE
+            ACTIVE
           </Badge>
         </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="stat-card"><StatCard title="Total Chats" value={data?.chats.length ?? 0} icon={<MessageSquare className="h-5 w-5" />} /></div>
-        <div className="stat-card"><StatCard title="Call Logs" value={data?.calls.length ?? 0} icon={<Phone className="h-5 w-5" />} /></div>
-        <div className="stat-card"><StatCard title="Contacts" value={data?.contacts.length ?? 0} icon={<Users className="h-5 w-5" />} /></div>
-        <div className="stat-card"><StatCard title="Images" value={data?.images.length ?? 0} icon={<Image className="h-5 w-5" />} /></div>
+        <div className="stat-card"><StatCard title="Total Chats" value={data?.chats.length ?? 0} icon={<MessageSquare className="h-5 w-5" />} loading={isLoadingCaseData} /></div>
+        <div className="stat-card"><StatCard title="Call Logs" value={data?.calls.length ?? 0} icon={<Phone className="h-5 w-5" />} loading={isLoadingCaseData} /></div>
+        <div className="stat-card"><StatCard title="Contacts" value={data?.contacts.length ?? 0} icon={<Users className="h-5 w-5" />} loading={isLoadingCaseData} /></div>
+        <div className="stat-card"><StatCard title="Images" value={data?.images.length ?? 0} icon={<Image className="h-5 w-5" />} loading={isLoadingCaseData} /></div>
       </div>
 
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="alert-card"><StatCard title="Suspicious Flags" value={suspiciousItems.length} icon={<AlertTriangle className="h-5 w-5" />} variant="danger" /></div>
-        <div className="alert-card"><StatCard title="Foreign Numbers" value={foreignNumbers.length} icon={<Globe className="h-5 w-5" />} variant="warning" /></div>
-        <div className="alert-card"><StatCard title="Crypto Wallets" value={cryptoWallets.length} icon={<Wallet className="h-5 w-5" />} variant="accent" /></div>
+        <div className="alert-card"><StatCard title="Suspicious Flags" value={suspiciousItems.length} icon={<AlertTriangle className="h-5 w-5" />} variant="danger" loading={isLoadingCaseData} /></div>
+        <div className="alert-card"><StatCard title="Foreign Numbers" value={foreignNumbers.length} icon={<Globe className="h-5 w-5" />} variant="warning" loading={isLoadingCaseData} /></div>
+        <div className="alert-card"><StatCard title="Crypto Wallets" value={cryptoWallets.length} icon={<Wallet className="h-5 w-5" />} variant="accent" loading={isLoadingCaseData} /></div>
       </div>
 
       {/* Map + Suspicious Items Grid */}
@@ -335,8 +376,23 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="h-64 relative">
-            <DashboardMiniMap />
+          <div className="h-44 md:h-64 relative bg-[#06080d]">
+            {isLoadingCaseData ? (
+              <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+                {/* Background grid */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(185,255,242,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(185,255,242,0.03)_1px,transparent_1px)] bg-[size:20px_20px]" />
+                <div className="flex flex-col items-center gap-2 opacity-40">
+                  <div className="h-10 w-10 rounded-full border border-primary/20 animate-cyber-pulse flex items-center justify-center">
+                    <MapPin className="h-5 w-5 text-primary/40" />
+                  </div>
+                  <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary/40">Syncing Coords...</span>
+                </div>
+                {/* Scanning line */}
+                <div className="absolute inset-x-0 h-[1.5px] bg-primary/20 shadow-[0_0_15px_rgba(var(--primary-rgb),0.4)] animate-scanline" />
+              </div>
+            ) : (
+              <DashboardMiniMap />
+            )}
           </div>
         </div>
 
@@ -356,30 +412,42 @@ export default function DashboardPage() {
 
           <ScrollArea className="flex-1 h-56">
             <div className="space-y-2 p-3">
-              {suspiciousItems.slice(0, 15).map((item, i) => {
-                const chat = item.record as any;
-                return (
-                  <div
-                    key={i}
-                    className="bg-secondary/50 rounded-lg p-2.5 border-l-2 border-destructive/60"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[11px] font-mono text-muted-foreground truncate flex-1">
-                        {chat.from} → {chat.to}
-                      </span>
-                      <Badge
-                        variant={item.severity === "high" ? "destructive" : "outline"}
-                        className="text-[9px] h-4 shrink-0"
-                      >
-                        {item.severity}
-                      </Badge>
+              {isLoadingCaseData ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-secondary/20 rounded-lg p-2.5 space-y-2 border border-border/30 relative overflow-hidden">
+                    <div className="flex justify-between">
+                      <Skeleton className="h-3 w-1/3 bg-destructive/10" />
+                      <Skeleton className="h-3 w-10 bg-muted/20" />
                     </div>
-                    <p className="text-xs leading-relaxed line-clamp-2">{chat.message}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">{item.reason}</p>
+                    <Skeleton className="h-3 w-full bg-muted/5" />
+                    <Skeleton className="h-2 w-1/2 bg-muted/10 opacity-50" />
                   </div>
-                );
-              })}
-              {suspiciousItems.length === 0 && (
+                ))
+              ) : suspiciousItems.length > 0 ? (
+                suspiciousItems.slice(0, 15).map((item, i) => {
+                  const chat = item.record as any;
+                  return (
+                    <div
+                      key={i}
+                      className="bg-secondary/50 rounded-lg p-2.5 border-l-2 border-destructive/60"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[11px] font-mono text-muted-foreground truncate flex-1">
+                          {chat.from} → {chat.to}
+                        </span>
+                        <Badge
+                          variant={item.severity === "high" ? "destructive" : "outline"}
+                          className="text-[9px] h-4 shrink-0"
+                        >
+                          {item.severity}
+                        </Badge>
+                      </div>
+                      <p className="text-xs leading-relaxed line-clamp-2">{chat.message}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{item.reason}</p>
+                    </div>
+                  );
+                })
+              ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   No suspicious items detected
                 </p>
@@ -398,7 +466,14 @@ export default function DashboardPage() {
             <Badge variant="outline" className="ml-auto text-[10px]">{foreignNumbers.length}</Badge>
           </h2>
           <div className="space-y-1.5 max-h-36 overflow-auto">
-            {foreignNumbers.map((num, i) => (
+            {isLoadingCaseData ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between bg-secondary/20 rounded px-3 py-1.5 opacity-60">
+                   <Skeleton className="h-3 w-24 bg-yellow-500/10" />
+                   <Skeleton className="h-3 w-8 bg-muted/20" />
+                </div>
+              ))
+            ) : foreignNumbers.map((num, i) => (
               <div key={i} className="flex items-center justify-between bg-secondary/50 rounded px-3 py-1.5">
                 <span className="font-mono text-xs">{num}</span>
                 <Badge variant="outline" className="text-[10px] font-mono">
@@ -419,7 +494,13 @@ export default function DashboardPage() {
             <Badge variant="outline" className="ml-auto text-[10px]">{cryptoWallets.length}</Badge>
           </h2>
           <div className="space-y-1.5 max-h-36 overflow-auto">
-            {cryptoWallets.map((w, i) => (
+            {isLoadingCaseData ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-secondary/20 rounded px-3 py-1.5 opacity-60">
+                   <Skeleton className="h-3 w-full bg-primary/10" />
+                </div>
+              ))
+            ) : cryptoWallets.map((w, i) => (
               <div key={i} className="bg-secondary/50 rounded px-3 py-1.5 font-mono text-xs break-all">
                 {w}
               </div>
@@ -460,7 +541,7 @@ export default function DashboardPage() {
           <BarChart3 className="h-4 w-4" />
           Investigation Tools
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
           <FeatureCard to="/timeline" icon={Calendar} title="Timeline" description="Interactive event timeline with zoom and filters" />
           <FeatureCard to="/chat" icon={Brain} title="AI Assistant" description="Ask questions about the case in plain English" />
           <FeatureCard to="/geospatial" icon={MapPin} title="Full Map" description="Interactive map with GPS clusters and satellite view" />

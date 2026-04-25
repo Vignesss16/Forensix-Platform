@@ -48,12 +48,12 @@ const InvestigationContext = createContext<InvestigationContextType | undefined>
 
 export function InvestigationProvider({ children }: { children: ReactNode }) {
   const [data, setDataState] = useState<InvestigationData | null>(null);
-  const [activeCaseId, setActiveCaseId] = useState<string | null>(() => localStorage.getItem("forensix-active-case-id"));
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(() => localStorage.getItem("chanakya-active-case-id"));
   const [activeCase, setActiveCase] = useState<any | null>(null);
   const [isLoadingCaseData, setIsLoadingCaseData] = useState(false);
   
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(() => {
-    const stored = localStorage.getItem("forensix-saved-searches");
+    const stored = localStorage.getItem("chanakya-saved-searches");
     return stored ? JSON.parse(stored) : [];
   });
   const { addNotification } = useNotifications();
@@ -61,55 +61,78 @@ export function InvestigationProvider({ children }: { children: ReactNode }) {
   // Load case data when activeCaseId changes
   useEffect(() => {
     if (activeCaseId) {
-      localStorage.setItem("forensix-active-case-id", activeCaseId);
+      localStorage.setItem("chanakya-active-case-id", activeCaseId);
       loadCaseData(activeCaseId);
     } else {
-      localStorage.removeItem("forensix-active-case-id");
+      localStorage.removeItem("chanakya-active-case-id");
       setDataState(null);
       setActiveCase(null);
     }
   }, [activeCaseId]);
 
-  const loadCaseData = async (caseId: string) => {
+  const loadCaseData = useCallback(async (caseId: string) => {
     setIsLoadingCaseData(true);
     try {
-      // Fire both queries in parallel — saves ~500ms vs sequential
       const [caseList, uploads] = await Promise.all([getCases(), getUploads()]);
 
-      // Restore Case Metadata
       const currentCase = caseList.find((c: any) => (c.id || c._id) === caseId);
       if (currentCase) {
         setActiveCase({ ...currentCase, id: currentCase.id || currentCase._id });
       }
 
-      // Restore Uploaded Forensic Data
       if (uploads && uploads.length > 0) {
+        // Find uploads explicitly linked to this case
         const caseUploads = uploads.filter((u: any) => u.case_id === caseId);
-        const latest = caseUploads[0] || uploads[0];
-        if (latest.ufdr_data) {
-          setDataState(latest.ufdr_data);
-          addNotification({ type: 'info', title: 'Evidence Synchronized', message: `Restored ${latest.file_name} for Case ID: ${caseId}` });
+        
+        if (caseUploads.length > 0) {
+          const latestMeta = caseUploads[0];
+          // Now fetch the FULL upload containing the megabytes of ufdr_data
+          try {
+            const latestFull = await getUploadById(latestMeta.id);
+            if (latestFull && latestFull.ufdr_data) {
+              setDataState(latestFull.ufdr_data);
+              addNotification({ type: 'info', title: 'Evidence Synchronized', message: `Restored ${latestFull.file_name} for Case ID: ${caseId}` });
+            } else {
+               setDataState(null);
+            }
+          } catch (e) {
+            console.error("Failed to load massive UFDR data chunk", e);
+            setDataState(null);
+          }
+        } else {
+           // No UFDR uploaded for this specific case yet
+           setDataState(null);
         }
+      } else {
+        setDataState(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to recover case data:", err);
+      // Handle authentication expiration specifically
+      if (err instanceof Error && err.message.includes("token")) {
+        addNotification({ 
+          type: 'error', 
+          title: 'Authentication Error', 
+          message: 'Your session has expired. Please log out and back in.' 
+        });
+        setDataState(null);
+        setActiveCase(null);
+      }
     } finally {
       setIsLoadingCaseData(false);
     }
-  };
+  }, [addNotification]);
 
-
-  const setData = (newData: InvestigationData) => {
+  const setData = useCallback((newData: InvestigationData) => {
     setDataState(newData);
-    // Add notification when new data is loaded
     addNotification({
       type: 'info',
       title: 'Investigation Data Loaded',
       message: `Loaded ${newData.chats.length} chats, ${newData.calls.length} calls, and ${newData.contacts.length} contacts`
     });
-  };
+  }, [addNotification]);
 
-  const clearData = () => setDataState(null);
+  const clearData = useCallback(() => setDataState(null), []);
 
   const suspiciousItems: SuspiciousItem[] = React.useMemo(() => {
     if (!data) return [];
@@ -203,7 +226,7 @@ export function InvestigationProvider({ children }: { children: ReactNode }) {
     );
   }, [data]);
 
-  const saveSearch = (name: string, criteria: SearchCriteria) => {
+  const saveSearch = useCallback((name: string, criteria: SearchCriteria) => {
     const newSearch: SavedSearch = {
       id: Date.now().toString(),
       name,
@@ -212,14 +235,14 @@ export function InvestigationProvider({ children }: { children: ReactNode }) {
     };
     const updated = [...savedSearches, newSearch];
     setSavedSearches(updated);
-    localStorage.setItem("forensix-saved-searches", JSON.stringify(updated));
-  };
+    localStorage.setItem("chanakya-saved-searches", JSON.stringify(updated));
+  }, [savedSearches]);
 
-  const deleteSavedSearch = (id: string) => {
+  const deleteSavedSearch = useCallback((id: string) => {
     const updated = savedSearches.filter(s => s.id !== id);
     setSavedSearches(updated);
-    localStorage.setItem("forensix-saved-searches", JSON.stringify(updated));
-  };
+    localStorage.setItem("chanakya-saved-searches", JSON.stringify(updated));
+  }, [savedSearches]);
 
   // Memoize the context value to prevent all consumers re-rendering when unrelated state changes
   const contextValue = useMemo(() => ({

@@ -1,10 +1,13 @@
 import { ReactNode } from "react";
+import { Skeleton } from "./ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface StatCardProps {
   title: string;
   value: string | number;
   icon: ReactNode;
   variant?: "default" | "warning" | "danger" | "accent";
+  loading?: boolean;
 }
 
 const variantStyles = {
@@ -21,7 +24,7 @@ const iconVariantStyles = {
   accent: "text-accent",
 };
 
-export default function StatCard({ title, value, icon, variant = "default" }: StatCardProps) {
+export default function StatCard({ title, value, icon, variant = "default", loading }: StatCardProps) {
   return (
     <div
       className={`bg-card rounded-lg p-5 ${variantStyles[variant]}`}
@@ -29,7 +32,21 @@ export default function StatCard({ title, value, icon, variant = "default" }: St
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-mono mb-2">{title}</p>
-          <p className="text-2xl font-bold font-mono stat-value" data-value={value}>{value}</p>
+          {loading ? (
+            <div className="h-8 flex items-center">
+              <Skeleton 
+                className={cn(
+                  "h-6 w-20",
+                  variant === "warning" ? "bg-warning/20" : 
+                  variant === "danger" ? "bg-destructive/20" : 
+                  variant === "accent" ? "bg-accent/20" : 
+                  "bg-primary/20"
+                )} 
+              />
+            </div>
+          ) : (
+            <p className="text-2xl font-bold font-mono stat-value" data-value={value}>0</p>
+          )}
         </div>
         <div className={`p-2 rounded-md bg-secondary ${iconVariantStyles[variant]}`}>
           {icon}

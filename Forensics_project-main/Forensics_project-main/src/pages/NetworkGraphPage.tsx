@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 
 interface Node {
   id: string;
@@ -39,6 +40,96 @@ export default function NetworkGraphPage() {
   const [showPhone, setShowPhone] = useState(true);
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [deferredData, setDeferredData] = useState<{ nodes: Node[]; links: Link[] }>({ nodes: [], links: [] });
+
+  // ── Processing Engine ───────────────────────────────────────────────────────
+  // Defer processing to prevent UI lockup on page mount
+  useEffect(() => {
+    if (!data) return;
+    
+    setIsProcessing(true);
+    
+    // Small timeout to allow navigation animation to finish and yield to main thread
+    const timer = setTimeout(() => {
+      const nodesMap = new Map<string, Node>();
+      const linksMap = new Map<string, Link>();
+      const contactPhones = new Set<string>();
+
+      function addNode(id: string, label: string, type: string) {
+        if (!nodesMap.has(id)) {
+          nodesMap.set(id, { id, label, type, val: 1 });
+        } else {
+          const node = nodesMap.get(id)!;
+          node.val += 1;
+        }
+      }
+
+      function addLink(source: string, target: string, label: string) {
+        const key = `${source}-${target}-${label}`;
+        const rev = `${target}-${source}-${label}`;
+        if (linksMap.has(key)) {
+          (linksMap.get(key) as any).count += 1;
+        } else if (linksMap.has(rev)) {
+          (linksMap.get(rev) as any).count += 1;
+        } else {
+          linksMap.set(key, { source, target, label, count: 1 } as any);
+        }
+      }
+
+      // Add contacts
+      data.contacts.forEach(c => {
+        addNode(c.phone, c.name || c.phone, "person");
+        contactPhones.add(c.phone);
+      });
+
+      // Process chats
+      data.chats.forEach(c => {
+        if (dateRange.start && new Date(c.timestamp) < new Date(dateRange.start)) return;
+        if (dateRange.end && new Date(c.timestamp) > new Date(dateRange.end)) return;
+
+        addNode(c.from, c.from, contactPhones.has(c.from) ? "person" : "phone");
+        addNode(c.to, c.to, contactPhones.has(c.to) ? "person" : "phone");
+        addLink(c.from, c.to, "chat");
+
+        CRYPTO_WALLET_PATTERNS.forEach(p => {
+          const matches = c.message.match(p);
+          if (matches) {
+            matches.forEach(w => {
+              const wId = `wallet:${w.slice(0, 10)}`;
+              addNode(wId, w.slice(0, 12) + "...", "wallet");
+              addLink(c.from, wId, "wallet");
+            });
+          }
+        });
+      });
+
+      // Process calls
+      data.calls.forEach(c => {
+        if (dateRange.start && new Date(c.timestamp) < new Date(dateRange.start)) return;
+        if (dateRange.end && new Date(c.timestamp) > new Date(dateRange.end)) return;
+
+        addNode(c.from, c.from, contactPhones.has(c.from) ? "person" : "phone");
+        addNode(c.to, c.to, contactPhones.has(c.to) ? "person" : "phone");
+        addLink(c.from, c.to, "call");
+      });
+
+      // Update names
+      data.contacts.forEach(c => {
+        if (nodesMap.has(c.phone)) {
+          nodesMap.get(c.phone)!.label = c.name || c.phone;
+        }
+      });
+
+      setDeferredData({
+        nodes: Array.from(nodesMap.values()),
+        links: Array.from(linksMap.values())
+      });
+      setIsProcessing(false);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [data, dateRange]);
 
   // Track container size
   useEffect(() => {
@@ -55,85 +146,8 @@ export default function NetworkGraphPage() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  const graphData = useMemo(() => {
-    if (!data) return { nodes: [], links: [] };
-
-    const nodesMap = new Map<string, { id: string; label: string; type: string; val: number }>();
-    const linksMap = new Map<string, { source: string; target: string; label: string; count: number }>();
-    const contactPhones = new Set<string>();
-
-    // Add contacts as persons
-    data.contacts.forEach(c => {
-      addNode(c.phone, c.name || c.phone, "person");
-      contactPhones.add(c.phone);
-    });
-
-    // Process chats
-    data.chats.forEach(c => {
-      if (dateRange.start && new Date(c.timestamp) < new Date(dateRange.start)) return;
-      if (dateRange.end && new Date(c.timestamp) > new Date(dateRange.end)) return;
-
-      addNode(c.from, c.from, contactPhones.has(c.from) ? "person" : "phone");
-      addNode(c.to, c.to, contactPhones.has(c.to) ? "person" : "phone");
-      addLink(c.from, c.to, "chat");
-
-      CRYPTO_WALLET_PATTERNS.forEach(p => {
-        const matches = c.message.match(p);
-        if (matches) {
-          matches.forEach(w => {
-            const wId = `wallet:${w.slice(0, 10)}`;
-            addNode(wId, w.slice(0, 12) + "...", "wallet");
-            addLink(c.from, wId, "wallet");
-          });
-        }
-      });
-    });
-
-    // Process calls
-    data.calls.forEach(c => {
-      if (dateRange.start && new Date(c.timestamp) < new Date(dateRange.start)) return;
-      if (dateRange.end && new Date(c.timestamp) > new Date(dateRange.end)) return;
-
-      addNode(c.from, c.from, contactPhones.has(c.from) ? "person" : "phone");
-      addNode(c.to, c.to, contactPhones.has(c.to) ? "person" : "phone");
-      addLink(c.from, c.to, "call");
-    });
-
-    // Update contact names
-    data.contacts.forEach(c => {
-      if (nodesMap.has(c.phone)) {
-        nodesMap.get(c.phone)!.label = c.name || c.phone;
-      }
-    });
-
-    const nodes = Array.from(nodesMap.values());
-    const links = Array.from(linksMap.values());
-
-    function addNode(id: string, label: string, type: string) {
-      if (!nodesMap.has(id)) {
-        nodesMap.set(id, { id, label, type, val: 1 });
-      } else {
-        nodesMap.get(id)!.val += 1;
-      }
-    }
-
-    function addLink(source: string, target: string, label: string) {
-      const key = `${source}-${target}-${label}`;
-      const rev = `${target}-${source}-${label}`;
-      if (linksMap.has(key)) {
-        linksMap.get(key)!.count += 1;
-      } else if (linksMap.has(rev)) {
-        linksMap.get(rev)!.count += 1;
-      } else {
-        linksMap.set(key, { source, target, label, count: 1 });
-      }
-    }
-
-    return { nodes, links };
-  }, [data, dateRange]);
-
   const filteredData = useMemo(() => {
-    const filteredNodes = graphData.nodes.filter(n => {
+    const filteredNodes = deferredData.nodes.filter(n => {
       if (n.type === "person" && !showPerson) return false;
       if (n.type === "wallet" && !showWallet) return false;
       if (n.type === "phone" && !showPhone) return false;
@@ -141,14 +155,14 @@ export default function NetworkGraphPage() {
     });
 
     const nodeIds = new Set(filteredNodes.map(n => n.id));
-    const filteredLinks = graphData.links.filter(l => {
+    const filteredLinks = deferredData.links.filter(l => {
       const sourceId = typeof l.source === "string" ? l.source : (l.source as Node).id;
       const targetId = typeof l.target === "string" ? l.target : (l.target as Node).id;
       return nodeIds.has(sourceId) && nodeIds.has(targetId);
     });
 
     return { nodes: filteredNodes, links: filteredLinks };
-  }, [graphData, showPerson, showWallet, showPhone]);
+  }, [deferredData, showPerson, showWallet, showPhone]);
 
   const nodeColor = useCallback((node: Node) => {
     switch (node.type) {
@@ -275,8 +289,23 @@ export default function NetworkGraphPage() {
               </Button>
             </div>
           </div>
+        ) : isProcessing ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-12 bg-[#06080d]/80 z-20 space-y-6 backdrop-blur-sm">
+            <div className="relative h-24 w-24">
+              <div className="absolute inset-0 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+              <div className="absolute inset-2 rounded-full border border-primary/10 border-b-primary/50 animate-spin [animation-duration:3s]" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Network className="h-8 w-8 text-primary animate-pulse" />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-mono text-primary cyber-text-glow animate-pulse">Analyzing Intelligence Relationships</p>
+              <p className="text-xs text-muted-foreground mt-2 font-mono uppercase tracking-[0.2em]">Processing nodes and links...</p>
+            </div>
+            {/* Scanner line */}
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-primary/30 shadow-[0_0_15px_rgba(var(--primary-rgb),0.5)] animate-scanline" />
+          </div>
         ) : (
-
           <ForceGraph2D
             ref={graphRef}
             graphData={filteredData}
@@ -294,15 +323,21 @@ export default function NetworkGraphPage() {
             backgroundColor="hsl(220, 25%, 6%)"
             nodeCanvasObjectMode={() => "after"}
             onNodeClick={(node: Node) => setSelectedNode(node)}
+            cooldownTicks={100}
+            minZoom={0.5}
+            maxZoom={10}
             onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
             nodeCanvasObject={(node: Node, ctx: CanvasRenderingContext2D, globalScale: number) => {
               const label = node.label || node.id;
-              const fontSize = Math.max(10 / globalScale, 2);
+              // Only render labels at reasonable zoom levels to save performance
+              if (globalScale < 0.8) return;
+              
+              const fontSize = Math.max(12 / globalScale, 1.5);
               ctx.font = `${fontSize}px JetBrains Mono, monospace`;
               ctx.textAlign = "center";
               ctx.textBaseline = "top";
-              ctx.fillStyle = "hsl(50, 100%, 70%)";
-              ctx.fillText(label.length > 14 ? label.slice(0, 14) + ".." : label, node.x!, node.y! + 8);
+              ctx.fillStyle = "hsl(50, 100%, 75%)";
+              ctx.fillText(label.length > 14 ? label.slice(0, 14) + ".." : label, node.x!, node.y! + 7);
             }}
           />
         )}

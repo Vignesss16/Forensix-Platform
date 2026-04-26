@@ -248,7 +248,15 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     try {
       const roadmap = await generateRoadmap(data);
       await addNote(selectedCase.id, roadmap);
-      toast.success("Intelligence Strategy Generated", { description: "AI Roadmap added to Field Logs." });
+      toast.success("Intelligence Strategy Generated", { 
+        description: "A new tactical roadmap has been appended to the Field Intelligence Log below.",
+        duration: 5000
+      });
+      // Small delay to allow UI to render before scrolling
+      setTimeout(() => {
+        const logs = document.querySelectorAll('.field-log-entry');
+        if (logs.length > 0) logs[logs.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
     } catch (error) {
       console.error(error);
       toast.error("Generation Failed");
@@ -290,7 +298,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
   );
 
   return (
-    <div className="space-y-4 md:space-y-6 max-w-7xl mx-auto pb-10 px-4 md:px-6 py-4 md:py-6">
+    <div className="space-y-4 md:space-y-6 w-full max-w-[1920px] mx-auto pb-10 px-4 md:px-8 py-4 md:py-6">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
@@ -636,7 +644,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                       selectedCase.notes.map((note, i) => {
                         const isRoadmap = note.includes("Based on the UFDR analysis");
                         return (
-                          <div key={i} className={`p-4 rounded-xl border border-border/50 relative group ${isRoadmap ? 'bg-primary/5 border-primary/20 p-6' : 'bg-card/50'}`}>
+                          <div key={i} className={`field-log-entry p-4 rounded-xl border border-border/50 relative group ${isRoadmap ? 'bg-primary/5 border-primary/20 p-6' : 'bg-card/50'}`}>
                             <span className="absolute top-4 right-4 text-[9px] font-mono text-muted-foreground opacity-50">Log #{i+1}</span>
                             {isRoadmap ? (
                               <InvestigationRoadmap 

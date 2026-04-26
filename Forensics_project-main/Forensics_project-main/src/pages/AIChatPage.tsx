@@ -358,12 +358,10 @@ export default function AIChatPage() {
   };
 
   useEffect(() => {
-    if (scrollViewportRef.current) {
-      scrollViewportRef.current.scrollTo({ 
-        top: scrollViewportRef.current.scrollHeight, 
-        behavior: 'smooth' 
-      });
-    }
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, 100);
+    return () => clearTimeout(timer);
   }, [activeConv?.messages]);
 
   const createConversation = (): Conversation => {
@@ -625,7 +623,7 @@ export default function AIChatPage() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 px-3 py-4 md:px-8 md:py-8" viewportRef={scrollViewportRef}>
+        <ScrollArea className="flex-1 px-3 py-4 md:px-8 md:py-8">
           {(!activeCaseId && conversations.length === 0) ? (
             <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto text-center py-20 space-y-10" ref={onboardingRef}>
               <div className="relative">

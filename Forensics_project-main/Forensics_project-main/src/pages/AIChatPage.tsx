@@ -358,9 +358,11 @@ export default function AIChatPage() {
   };
 
   useEffect(() => {
-    const viewport = document.querySelector('[data-radix-scroll-area-viewport]');
-    if (viewport) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+    if (scrollViewportRef.current) {
+      scrollViewportRef.current.scrollTo({ 
+        top: scrollViewportRef.current.scrollHeight, 
+        behavior: 'smooth' 
+      });
     }
   }, [activeConv?.messages]);
 
@@ -474,8 +476,11 @@ export default function AIChatPage() {
   }, [input, activeId, activeConv, isStreaming, data, activeCaseId]);
 
 
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   return (
-    <div className="fixed inset-0 flex flex-col md:pl-40 lg:pl-64 pt-[53px] md:pt-0 overflow-hidden bg-background" ref={containerRef}>
+    <div className="flex flex-col flex-1 h-full min-h-0 w-full overflow-hidden bg-background relative" ref={containerRef}>
       <div className="flex flex-1 min-h-0 w-full overflow-hidden">
       <AnimatePresence>
         {sidebarOpen && (
@@ -621,7 +626,7 @@ export default function AIChatPage() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 px-3 py-4 md:px-8 md:py-8">
+        <ScrollArea className="flex-1 px-3 py-4 md:px-8 md:py-8" viewportRef={scrollViewportRef}>
           {(!activeCaseId && conversations.length === 0) ? (
             <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto text-center py-20 space-y-10" ref={onboardingRef}>
               <div className="relative">

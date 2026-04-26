@@ -9,7 +9,9 @@ interface InvestigationRoadmapProps {
 }
 
 export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoadmapProps) {
-  const rawPhases = content.split(/### Phase \d+: /).filter(Boolean);
+  // Parse markdown tasks from the content
+  // We use the same split logic as CaseManagement to ensure indices match perfectly
+  const rawPhases = content.split(/(?=### Phase \d+: )/);
   const phaseNames = ["Immediate Leads", "Digital Trail Analysis", "Communication Networks", "Field Operations"];
 
   // Calculate overall progress
@@ -70,7 +72,12 @@ export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoa
         {rawPhases.map((phaseContent, idx) => {
           const lines = phaseContent.split("\n");
           const tasks = lines.filter(t => t.trim().startsWith("- ["));
-          const phaseName = phaseNames[idx] || `Phase ${idx + 1}`;
+          if (tasks.length === 0) return null; // Skip blocks without tasks (like the intro)
+          
+          // Determine which phase name to use based on the "### Phase X" header
+          const phaseHeaderMatch = phaseContent.match(/### Phase (\d+):/);
+          const phaseNum = phaseHeaderMatch ? parseInt(phaseHeaderMatch[1]) : null;
+          const phaseName = phaseNum ? (phaseNames[phaseNum - 1] || `Phase ${phaseNum}`) : `Operational Phase`;
           
           return (
             <motion.div 
@@ -90,9 +97,13 @@ export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoa
                     {idx === 3 && <Shield className="h-4 w-4 text-primary" />}
                   </div>
                   <div>
-                    <h3 className="text-[10px] font-black font-mono tracking-[0.2em] text-primary/60 uppercase">PHASE 0{idx + 1}</h3>
+                    <h3 className="text-[10px] font-black font-mono tracking-[0.2em] text-primary/60 uppercase">
+                      PHASE 0{phaseNum || idx}
+                    </h3>
                     <h4 className="text-sm font-bold text-foreground tracking-tight">{phaseName}</h4>
-                    <p className="text-[9px] text-muted-foreground/60 mt-0.5">{phaseObjectives[idx]}</p>
+                    <p className="text-[9px] text-muted-foreground/60 mt-0.5">
+                      {phaseNum ? phaseObjectives[phaseNum - 1] : "Tactical investigation directive."}
+                    </p>
                   </div>
                 </div>
 

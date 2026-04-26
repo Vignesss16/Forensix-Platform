@@ -197,15 +197,15 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     const targetCase = cases.find(c => c.id === caseId);
     if (!targetCase) return;
 
-    const [phaseIdx, taskIdx] = taskKey.split('-').map(Number);
+    const [phaseNum, taskIdx] = taskKey.split('-').map(Number);
     const newNotes = [...targetCase.notes];
     let note = newNotes[noteIndex];
 
     const rawPhases = note.split(/(?=### Phase \d+: )/);
-    const offset = note.trim().startsWith("###") ? 0 : 1;
-    const targetPhaseIdx = phaseIdx + offset;
+    // Robust Lookup: Find the phase that contains the matching "### Phase X" header
+    const targetPhaseIdx = rawPhases.findIndex(p => p.includes(`### Phase ${phaseNum}:`));
     
-    if (!rawPhases[targetPhaseIdx]) {
+    if (targetPhaseIdx === -1 || !rawPhases[targetPhaseIdx]) {
       toast.error("Failed to update task: Phase not found");
       return;
     }

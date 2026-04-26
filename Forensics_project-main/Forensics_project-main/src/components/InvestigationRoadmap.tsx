@@ -120,7 +120,7 @@ export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoa
                             ? 'bg-primary/5 border-primary/5 opacity-50' 
                             : 'bg-secondary/10 border-white/5 hover:bg-secondary/30 hover:border-primary/20 shadow-sm'
                         }`}
-                        onClick={() => onToggleTask?.(`${idx}-${tIdx}`)}
+                        onClick={() => onToggleTask?.(`${phaseNum || idx}-${tIdx}`)}
                       >
                         <div className="shrink-0 mt-0.5">
                           {isCompleted ? (

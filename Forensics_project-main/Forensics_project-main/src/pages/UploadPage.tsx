@@ -237,6 +237,31 @@ export default function UploadPage() {
     openCaseGate(file);
   }, [activeCaseId]);
 
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    // Filter for common media extensions
+    const mediaExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi'];
+    const mediaFiles = Array.from(files).filter(f => 
+      mediaExtensions.some(ext => f.name.toLowerCase().endsWith(ext))
+    );
+
+    if (mediaFiles.length === 0) {
+      toast.error("No images or videos found in the selected folder");
+      return;
+    }
+    setPendingMediaFiles(mediaFiles);
+    setPendingFile(null); // Clear UFDR if exists
+    
+    // If active case exists, process directly. Otherwise open gate.
+    if (activeCaseId) {
+      processMediaFiles(mediaFiles, activeCaseId);
+    } else {
+      openCaseGate(mediaFiles[0]); // Hack to open gate
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

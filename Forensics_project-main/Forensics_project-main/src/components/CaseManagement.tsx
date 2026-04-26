@@ -202,10 +202,15 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     let note = newNotes[noteIndex];
 
     const rawPhases = note.split(/(?=### Phase \d+: )/);
-    // Find the phase content (the one after the split)
-    // Note: split with lookahead keeps the delimiter
-    const targetPhase = rawPhases[phaseIdx + (note.startsWith("###") ? 0 : 1)];
-    const lines = targetPhase.split("\n");
+    const offset = note.trim().startsWith("###") ? 0 : 1;
+    const targetPhaseIdx = phaseIdx + offset;
+    
+    if (!rawPhases[targetPhaseIdx]) {
+      toast.error("Failed to update task: Phase not found");
+      return;
+    }
+
+    const lines = rawPhases[targetPhaseIdx].split("\n");
     let currentTaskCount = 0;
     
     const updatedLines = lines.map(line => {
@@ -219,7 +224,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
       return line;
     });
 
-    rawPhases[phaseIdx + (note.startsWith("###") ? 0 : 1)] = updatedLines.join("\n");
+    rawPhases[targetPhaseIdx] = updatedLines.join("\n");
     newNotes[noteIndex] = rawPhases.join("");
 
     try {
@@ -298,7 +303,7 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
   );
 
   return (
-    <div className="space-y-4 md:space-y-6 w-full pb-10 px-4 md:px-8 py-4 md:py-6">
+    <div className="space-y-4 md:space-y-6 w-full max-w-[1920px] mx-auto pb-10 px-4 md:px-8 py-4 md:py-6">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>

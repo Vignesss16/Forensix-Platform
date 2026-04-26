@@ -10,6 +10,8 @@ interface InvestigationRoadmapProps {
 
 export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoadmapProps) {
   // Parse markdown tasks from the content
+  // Use lookahead to keep the "### Phase X: " header in the content if needed, 
+  // but here we just need the content blocks.
   const rawPhases = content.split(/### Phase \d+: /).filter(Boolean);
   const phaseNames = ["Immediate Leads", "Digital Trail Analysis", "Communication Networks", "Field Operations"];
 
@@ -92,7 +94,9 @@ export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoa
                       >
                         <div className="shrink-0 mt-0.5">
                           {isCompleted ? (
-                            <CheckCircle2 className="h-4 w-4 text-primary" />
+                            <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
+                              <CheckCircle2 className="h-3 w-3 text-primary animate-in zoom-in duration-300" />
+                            </div>
                           ) : (
                             <Circle className="h-4 w-4 text-muted-foreground/30 group-hover/item:text-primary/50 transition-colors" />
                           )}

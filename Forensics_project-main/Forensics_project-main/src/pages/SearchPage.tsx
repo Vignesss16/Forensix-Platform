@@ -15,7 +15,7 @@ export default function SearchPage() {
 
   return (
     <div className="p-6 flex flex-col gap-6">
-      <div className="sticky md:top-0 top-[53px] bg-background/80 backdrop-blur-md z-20 pb-4">
+      <div className="sticky top-0 bg-background/80 backdrop-blur-md z-20 pb-4 pt-2">
         <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow flex items-center gap-3 uppercase">
           <Search className="h-6 w-6" />
           Advanced Search

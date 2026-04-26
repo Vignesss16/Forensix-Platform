@@ -215,7 +215,7 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-[100dvh] overflow-hidden bg-background">
 
       {/* ── DESKTOP Sidebar (always visible on md+) ── */}
       <aside
@@ -262,7 +262,7 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
         </header>
 
         {/* Page content */}
-        <main ref={mainContentRef} className={`flex-1 flex flex-col relative bg-[#020617] opacity-100 ${location.pathname === '/chat' ? 'overflow-hidden' : 'overflow-auto'}`}>
+        <main ref={mainContentRef} className={`flex-1 flex flex-col relative bg-[#020617] min-h-0 ${location.pathname === '/chat' ? 'overflow-hidden' : 'overflow-auto'}`}>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,255,242,0.03),transparent_70%)] pointer-events-none" />
           {children}
         </main>

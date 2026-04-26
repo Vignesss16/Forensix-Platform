@@ -296,7 +296,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-4 md:space-y-6 dashboard-container px-4 md:px-6 py-4 md:py-6" ref={containerRef}>
       {/* Header */}
-      <div className="flex items-start md:items-center justify-between flex-wrap gap-2 sticky md:top-0 top-[53px] bg-background/80 backdrop-blur-md z-20 pb-4">
+      <div className="flex items-start md:items-center justify-between flex-wrap gap-2 sticky top-0 bg-background/80 backdrop-blur-md z-20 pb-4 pt-2">
         <div>
           <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow uppercase dashboard-title">
             MISSION DASHBOARD

@@ -472,8 +472,8 @@ export default function AIChatPage() {
 
 
   return (
-    <div className="absolute inset-0 flex overflow-hidden bg-background" ref={containerRef}>
-      {/* Mobile Backdrop */}
+    <div className="flex flex-col md:h-full h-[calc(100dvh-53px)] w-full overflow-hidden bg-background relative" ref={containerRef}>
+      <div className="flex flex-1 min-h-0 w-full overflow-hidden">
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div 
@@ -687,5 +687,6 @@ export default function AIChatPage() {
         </div>
       </div>
     </div>
+  </div>
   );
 }

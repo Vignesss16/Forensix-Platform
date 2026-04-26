@@ -269,8 +269,8 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-8 overflow-hidden bg-background" ref={containerRef}>
-      <div className="text-center mb-10 opacity-0" ref={contentRef}>
+    <div className="flex-1 w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto bg-background" ref={containerRef}>
+      <div className="mt-8 md:mt-0 text-center mb-10 opacity-0" ref={contentRef}>
         <h1 className="text-4xl font-black font-mono text-primary cyber-text-glow mb-3 tracking-[0.2em] uppercase">
           Evidence Upload
         </h1>
@@ -299,6 +299,7 @@ export default function UploadPage() {
       >
         <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none" />
         <input id="file-input" type="file" className="hidden" accept=".json,.xml,.sqlite,.db" onChange={handleFileSelect} />
+        <input id="folder-input" type="file" className="hidden" webkitdirectory="" directory="" multiple onChange={handleFolderSelect} />
 
         {isLoading ? (
           <div className="flex flex-col items-center gap-4 py-8">
@@ -327,10 +328,22 @@ export default function UploadPage() {
         )}
       </div>
 
-      <div className="mt-12">
-        <Button variant="ghost" onClick={loadSample} className="font-mono gap-2 text-muted-foreground hover:text-primary transition-colors">
+      <div className="mt-8 flex flex-col sm:flex-row items-center gap-4">
+        <Button 
+          variant="outline" 
+          onClick={() => document.getElementById("folder-input")?.click()}
+          className="font-mono gap-2 text-primary border-primary/20 hover:bg-primary/5 uppercase tracking-widest text-[10px] h-9"
+        >
+          <FolderOpen className="h-4 w-4" />
+          Upload Images Folder
+        </Button>
+        <Button 
+          variant="ghost" 
+          onClick={loadSample} 
+          className="font-mono gap-2 text-muted-foreground hover:text-primary transition-colors text-[10px] h-9"
+        >
           <Sparkles className="h-4 w-4" />
-          Quick Load Sample Investigation Data
+          Quick Load Sample
         </Button>
       </div>
 

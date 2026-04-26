@@ -358,7 +358,10 @@ export default function AIChatPage() {
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const viewport = document.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+    }
   }, [activeConv?.messages]);
 
   const createConversation = (): Conversation => {
@@ -472,7 +475,7 @@ export default function AIChatPage() {
 
 
   return (
-    <div className="flex flex-col md:h-full h-[calc(100dvh-53px)] w-full overflow-hidden bg-background relative" ref={containerRef}>
+    <div className="fixed inset-0 flex flex-col md:pl-40 lg:pl-64 pt-[53px] md:pt-0 overflow-hidden bg-background" ref={containerRef}>
       <div className="flex flex-1 min-h-0 w-full overflow-hidden">
       <AnimatePresence>
         {sidebarOpen && (

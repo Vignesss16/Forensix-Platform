@@ -358,11 +358,10 @@ export default function AIChatPage() {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [activeConv?.messages]);
+    // Professional dynamic scroll: instantly on load, smooth on updates
+    const behavior = conversations.length <= 1 ? "auto" : "smooth";
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+  }, [activeConv?.messages?.length, isStreaming]);
 
   const createConversation = (): Conversation => {
     const conv: Conversation = { id: Date.now().toString(), title: "New investigation query", messages: [], createdAt: new Date(), updatedAt: new Date() };
@@ -416,6 +415,8 @@ export default function AIChatPage() {
           };
         })
       );
+      // Dynamic scroll on every token flush
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }, 80);
 
     try {

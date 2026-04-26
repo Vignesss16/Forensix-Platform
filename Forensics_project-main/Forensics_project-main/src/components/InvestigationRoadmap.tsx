@@ -9,9 +9,6 @@ interface InvestigationRoadmapProps {
 }
 
 export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoadmapProps) {
-  // Parse markdown tasks from the content
-  // Use lookahead to keep the "### Phase X: " header in the content if needed, 
-  // but here we just need the content blocks.
   const rawPhases = content.split(/### Phase \d+: /).filter(Boolean);
   const phaseNames = ["Immediate Leads", "Digital Trail Analysis", "Communication Networks", "Field Operations"];
 
@@ -20,8 +17,29 @@ export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoa
   const completedTasks = content.match(/- \[x\]/g) || [];
   const progressPercent = allTasks.length > 0 ? Math.round((completedTasks.length / allTasks.length) * 100) : 0;
 
+  const phaseObjectives = [
+    "Immediate high-value leads and suspect identification.",
+    "Tracing digital footprints across platforms and entities.",
+    "Mapping financial flows and encrypted chat patterns.",
+    "On-ground actions and inter-agency coordination."
+  ];
+
   return (
     <div className="space-y-6">
+      <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-6">
+        <div className="flex items-start gap-3">
+          <BrainCircuit className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-xs font-bold font-mono text-primary uppercase tracking-wider mb-1">Tactical Briefing</h3>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Chanakya AI has synthesized your uploaded UFDR evidence into a 4-phase investigative roadmap. 
+              Each phase contains specific **Directives**—operational tasks you should verify or execute. 
+              Mark tasks as complete as you validate them in the field.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
           <h2 className="text-xl font-black font-mono tracking-tighter text-primary flex items-center gap-2">
@@ -74,6 +92,7 @@ export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoa
                   <div>
                     <h3 className="text-[10px] font-black font-mono tracking-[0.2em] text-primary/60 uppercase">PHASE 0{idx + 1}</h3>
                     <h4 className="text-sm font-bold text-foreground tracking-tight">{phaseName}</h4>
+                    <p className="text-[9px] text-muted-foreground/60 mt-0.5">{phaseObjectives[idx]}</p>
                   </div>
                 </div>
 
@@ -102,16 +121,20 @@ export function InvestigationRoadmap({ content, onToggleTask }: InvestigationRoa
                           )}
                         </div>
                         <div className="flex flex-col gap-1.5 flex-1">
-                          <p className={`text-xs leading-relaxed ${isCompleted ? 'line-through text-muted-foreground' : 'text-foreground/90'}`}>
+                          <p className={`text-xs leading-relaxed ${isCompleted ? 'line-through text-muted-foreground opacity-70' : 'text-foreground/90 font-medium'}`}>
                             {cleanTask}
                           </p>
-                          {!isCompleted && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/10">Priority Analysis</span>
-                              <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
-                              <span className="text-[9px] text-muted-foreground/60 font-medium">Pending Data Validation</span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {isCompleted ? (
+                              <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/10">Mission Complete</span>
+                            ) : (
+                              <>
+                                <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/10">Directive Pending</span>
+                                <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                                <span className="text-[9px] text-muted-foreground/60 font-medium">Click to Validate</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

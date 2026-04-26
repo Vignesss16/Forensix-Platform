@@ -17,8 +17,8 @@ export default function GeospatialPage() {
   };
 
   return (
-    <div className="p-4 h-[calc(100vh-4rem)] flex flex-col">
-      <div className="mb-4 shrink-0">
+    <div className="p-4 flex-1 flex flex-col min-h-0">
+      <div className="mb-4 shrink-0 sticky top-0 bg-background/80 backdrop-blur-md z-20 pb-2">
         <h1 className="text-xl md:text-2xl font-black font-mono tracking-[0.2em] text-primary cyber-text-glow uppercase">
           Geospatial Intelligence
         </h1>

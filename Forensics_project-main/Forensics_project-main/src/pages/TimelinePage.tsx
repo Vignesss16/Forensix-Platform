@@ -71,7 +71,7 @@ export default function TimelinePage() {
 
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col flex-1 min-h-0">
       {!data ? (
         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-[#0a0a0f]">
            <div className="relative mb-6">
@@ -95,7 +95,7 @@ export default function TimelinePage() {
       ) : (
         <>
           {/* Header */}
-          <div className="p-4 border-b border-border">
+          <div className="p-4 border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />

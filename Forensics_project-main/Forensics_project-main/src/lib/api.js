@@ -87,3 +87,30 @@ export const saveSearch = (searchData) =>
 
 export const deleteSavedSearch = (id) =>
   apiFetch(`/searches?id=${id}`, { method: 'DELETE' });
+
+// ── JOINT OPERATIONS (CASE INVITES) ───────────────────────────────────────────
+
+// Get all pending invites for the logged-in officer
+export const getPendingInvites = () => apiFetch('/case-invites');
+
+// Owner sends an invite: target_officer_ref = "OFF111"
+export const sendCaseInvite = (case_id, target_officer_ref) =>
+  apiFetch('/case-invites', {
+    method: 'POST',
+    body: JSON.stringify({ case_id, target_officer_ref }),
+  });
+
+// Officer accepts or declines an invite
+export const respondToInvite = (membershipId, action) =>
+  apiFetch(`/case-invites?id=${membershipId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action }),  // action: 'accept' | 'decline'
+  });
+
+// Owner revokes a collaborator's access
+export const revokeAccess = (membershipId) =>
+  apiFetch(`/case-invites?id=${membershipId}`, { method: 'DELETE' });
+
+// Search officers by their user_id (e.g. "OFF111")
+export const searchOfficers = (query) =>
+  apiFetch(`/officers?q=${encodeURIComponent(query)}`);

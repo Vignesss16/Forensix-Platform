@@ -32,12 +32,34 @@ export default async function handler(req, res) {
 
   const id = req.query.id;
 
-  // GET /api/cases — list all
+  // GET /api/cases — list cases the officer owns OR is an accepted member of
   if (req.method === 'GET' && !id) {
     try {
+      // Admins see everything
+      if (user.role === 'admin') {
+        const { data, error } = await supabase
+          .from('cases')
+          .select('*, members:case_members(id, officer_id, role, status, invited_at, accepted_at, officer:officer_id(user_id, email))')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return res.json(data);
+      }
+
+      // Officers: fetch all case_ids they have accepted access to
+      const { data: memberships, error: mErr } = await supabase
+        .from('case_members')
+        .select('case_id')
+        .eq('officer_id', user.userId)
+        .eq('status', 'accepted');
+      if (mErr) throw mErr;
+
+      const accessibleCaseIds = memberships.map(m => m.case_id);
+
+      // Get those cases + members for each
       const { data, error } = await supabase
         .from('cases')
-        .select('*')
+        .select('*, members:case_members(id, officer_id, role, status, invited_at, accepted_at, officer:officer_id(user_id, email))')
+        .in('id', accessibleCaseIds.length > 0 ? accessibleCaseIds : ['00000000-0000-0000-0000-000000000000'])
         .order('created_at', { ascending: false });
       if (error) throw error;
       return res.json(data);

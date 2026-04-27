@@ -8,14 +8,24 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FolderOpen, Plus, Edit, Trash2, FileText, Users, Calendar, AlertTriangle, Loader2, Target, ShieldAlert, FileClock, Search, CheckCircle2, Database, GitBranch, BrainCircuit } from "lucide-react";
+import { FolderOpen, Plus, Trash2, FileText, Users, AlertTriangle, Loader2, Target, ShieldAlert, FileClock, Search, CheckCircle2, Database, BrainCircuit, UserPlus, X, UserCheck, Shield, UserX, Inbox } from "lucide-react";
 import { toast } from "sonner";
-import { getCases, createCase, updateCase as updateCaseApi, deleteCase as deleteCaseApi } from '@/lib/api';
+import { getCases, createCase, updateCase as updateCaseApi, deleteCase as deleteCaseApi, sendCaseInvite, searchOfficers, revokeAccess, getPendingInvites, respondToInvite } from '@/lib/api';
 import { generateRoadmap } from "@/lib/localLLM";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 import { InvestigationRoadmap } from "./InvestigationRoadmap";
 import { Skeleton } from "@/components/ui/skeleton";
+
+interface CaseMember {
+  id: string;
+  officer_id: string;
+  role: 'owner' | 'collaborator';
+  status: 'pending' | 'accepted' | 'declined';
+  invited_at: string;
+  accepted_at?: string;
+  officer?: { user_id: string; email: string };
+}
 
 interface Case {
   id: string;
@@ -28,6 +38,7 @@ interface Case {
   assignedTo?: string;
   tags: string[];
   notes: string[];
+  members?: CaseMember[];
 }
 
 interface CaseManagementProps {
@@ -59,6 +70,55 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const location = useLocation();
 
+  // Joint Operation invite state
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [officerSearch, setOfficerSearch] = useState("");
+  const [officerResults, setOfficerResults] = useState<any[]>([]);
+  const [searchingOfficer, setSearchingOfficer] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  // Pending invites for logged-in user
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+
+  // Get the logged-in officer's ID from localStorage
+  const currentUserRef = (() => {
+    try { return JSON.parse(localStorage.getItem('chanakya_user') || '{}')?.id || ''; } catch { return ''; }
+  })();
+
+  const refreshPendingInvites = async () => {
+    try {
+      const data = await getPendingInvites();
+      setPendingInvites(data || []);
+    } catch (e) {
+      console.error("Failed to fetch invites");
+    }
+  };
+
+  useEffect(() => {
+    refreshPendingInvites();
+  }, []);
+
+  const handleRespondToInvite = async (inviteId: string, action: 'accept' | 'decline') => {
+    setRespondingId(inviteId);
+    try {
+      await respondToInvite(inviteId, action);
+      toast.success(action === 'accept' ? 'Joint Operation Accepted' : 'Invite Declined');
+      await refreshPendingInvites();
+      
+      if (action === 'accept') {
+        const refreshed = await getCases();
+        const fmt = refreshed.map((c: any) => ({ ...c, id: c.id || c._id, createdAt: new Date(c.created_at || c.createdAt), updatedAt: new Date(c.updated_at || c.updatedAt || c.created_at) }));
+        setCases(fmt);
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Action failed');
+    } finally {
+      setRespondingId(null);
+    }
+  };
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newCase, setNewCase] = useState<Partial<Case>>({
     title: "",
@@ -68,6 +128,37 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
     tags: [],
     notes: []
   });
+
+  // Officer search with debounce for invite modal
+  const handleOfficerSearch = async (q: string) => {
+    setOfficerSearch(q);
+    if (q.trim().length < 2) { setOfficerResults([]); return; }
+    setSearchingOfficer(true);
+    try {
+      const results = await searchOfficers(q.trim());
+      setOfficerResults(results);
+    } catch { setOfficerResults([]); }
+    finally { setSearchingOfficer(false); }
+  };
+
+  const handleSendInvite = async (targetRef: string) => {
+    if (!selectedCase) return;
+    setSendingInvite(true);
+    try {
+      await sendCaseInvite(selectedCase.id, targetRef);
+      toast.success(`Invite sent to ${targetRef}`, { description: `They will see it on their dashboard.` });
+      setShowInviteModal(false);
+      setOfficerSearch('');
+      setOfficerResults([]);
+      // Refresh cases to update members list
+      const refreshed = await getCases();
+      const fmt = refreshed.map((c: any) => ({ ...c, id: c.id || c._id, createdAt: new Date(c.created_at || c.createdAt), updatedAt: new Date(c.updated_at || c.updatedAt || c.created_at) }));
+      setCases(fmt);
+      const updated = fmt.find((c: any) => c.id === selectedCase.id);
+      if (updated) setSelectedCase(updated);
+    } catch (e: any) { toast.error(e.message || 'Failed to send invite'); }
+    finally { setSendingInvite(false); }
+  };
 
   useEffect(() => {
     if (location.state?.openCreateModal) {
@@ -304,6 +395,61 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
 
   return (
     <div className="space-y-4 md:space-y-6 w-full max-w-[1920px] mx-auto pb-10 px-4 md:px-8 py-4 md:py-6">
+      
+      {/* ── Pending Invites Notification Area ──────────────────────────────── */}
+      <AnimatePresence>
+        {pendingInvites.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-6 overflow-hidden"
+          >
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+              <h3 className="text-sm font-mono font-bold uppercase tracking-widest text-blue-400 mb-3 flex items-center gap-2">
+                <Inbox className="h-4 w-4" /> Pending Joint Operation Requests
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {pendingInvites.map((invite) => (
+                  <div key={invite.id} className="bg-black/20 border border-blue-500/20 rounded-lg p-3 flex flex-col justify-between">
+                    <div className="mb-3">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+                        Invited by <span className="text-primary font-bold">{invite.inviter?.user_id}</span>
+                      </p>
+                      <p className="text-sm font-mono font-bold text-foreground">
+                        {invite.case?.title}
+                      </p>
+                      <p className="text-[9px] text-muted-foreground font-mono mt-1">
+                        CASE ID: {invite.case?.case_number}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        disabled={respondingId === invite.id}
+                        onClick={() => handleRespondToInvite(invite.id, 'accept')}
+                        className="flex-1 h-7 text-[10px] font-mono tracking-widest uppercase bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border-none"
+                      >
+                        {respondingId === invite.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Accept'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={respondingId === invite.id}
+                        onClick={() => handleRespondToInvite(invite.id, 'decline')}
+                        className="flex-1 h-7 text-[10px] font-mono tracking-widest uppercase text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                      >
+                        Decline
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
@@ -512,9 +658,17 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                               <h3 className={`font-mono text-xs uppercase tracking-wider font-bold truncate pr-2 ${isSelected ? 'text-primary' : ''}`}>
                                 {caseData.title}
                               </h3>
-                              <Badge variant="outline" className={`text-[8px] uppercase tracking-widest px-1.5 py-0 rounded-sm ${getStatusColor(caseData.status)}`}>
-                                {caseData.status}
-                              </Badge>
+                              <div className="flex items-center gap-1">
+                                {/* Joint Op badge — shown when this case has collaborators */}
+                                {(caseData as any).members?.some((m: CaseMember) => m.role === 'collaborator' && m.status === 'accepted') && (
+                                  <Badge variant="outline" className="text-[7px] uppercase tracking-widest px-1 py-0 rounded-sm bg-blue-500/10 text-blue-400 border-blue-500/20">
+                                    🤝 Joint Op
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className={`text-[8px] uppercase tracking-widest px-1.5 py-0 rounded-sm ${getStatusColor(caseData.status)}`}>
+                                  {caseData.status}
+                                </Badge>
+                              </div>
                             </div>
                             <p className="text-[10px] text-muted-foreground line-clamp-1 mb-2 opacity-70">
                               {caseData.description}
@@ -583,6 +737,12 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                         <CheckCircle2 className="h-3.5 w-3.5" /> Operations Active
                       </Badge>
                     )}
+                    {/* Show Invite button only if current user is the owner */}
+                    {(selectedCase as any).members?.find((m: CaseMember) => m.officer?.user_id === currentUserRef && m.role === 'owner') && (
+                      <Button variant="outline" size="sm" onClick={() => setShowInviteModal(true)} className="text-[10px] font-mono uppercase tracking-widest border-blue-500/30 text-blue-400 hover:bg-blue-500/10">
+                        <UserPlus className="h-3.5 w-3.5 mr-1" /> Invite Officer
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={() => handleUpdateCaseStatus(selectedCase.id, selectedCase.status === 'active' ? 'closed' : 'active')} className="text-[10px] font-mono uppercase">
                       {selectedCase.status === "active" ? "Mark Closed" : "Re-open"}
                     </Button>
@@ -620,6 +780,61 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
                     <p className="font-mono text-[11px] text-foreground tracking-tighter">{selectedCase.updatedAt.toLocaleDateString('en-IN')}</p>
                   </div>
                 </div>
+
+                {/* ── Joint Operation Team Panel ─────────────────────────── */}
+                {(selectedCase as any).members && (selectedCase as any).members.length > 0 && (
+                  <div className="mt-4 border border-blue-500/20 rounded-xl bg-blue-500/5 p-4">
+                    <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-blue-400 mb-3 flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5" /> Joint Operation Team
+                    </h4>
+                    <div className="space-y-2">
+                      {((selectedCase as any).members as CaseMember[]).map((member) => (
+                        <div key={member.id} className="flex items-center justify-between bg-black/20 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            {member.role === 'owner' ? (
+                              <Shield className="h-3.5 w-3.5 text-primary shrink-0" />
+                            ) : member.status === 'accepted' ? (
+                              <UserCheck className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                            ) : (
+                              <Users className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                            )}
+                            <div>
+                              <p className="text-xs font-mono font-bold text-foreground">{member.officer?.user_id || 'Unknown'}</p>
+                              <p className="text-[9px] text-muted-foreground">
+                                {member.role === 'owner' ? 'Case Owner' : member.status === 'accepted' ? 'Collaborator' : `Invite ${member.status}`}
+                              </p>
+                            </div>
+                          </div>
+                          {/* Only owner can revoke collaborators */}
+                          {member.role !== 'owner' && (selectedCase as any).members?.find((m: CaseMember) => m.officer?.user_id === currentUserRef && m.role === 'owner') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              disabled={revokingId === member.id}
+                              onClick={async () => {
+                                setRevokingId(member.id);
+                                try {
+                                  await revokeAccess(member.id);
+                                  toast.success(`Access revoked from ${member.officer?.user_id}`);
+                                  // Refresh cases
+                                  const refreshed = await getCases();
+                                  const fmt = refreshed.map((c: any) => ({ ...c, id: c.id || c._id, createdAt: new Date(c.created_at || c.createdAt), updatedAt: new Date(c.updated_at || c.updatedAt || c.created_at) }));
+                                  setCases(fmt);
+                                  const updated = fmt.find((c: any) => c.id === selectedCase.id);
+                                  if (updated) setSelectedCase(updated);
+                                } catch (e: any) { toast.error(e.message); }
+                                finally { setRevokingId(null); }
+                              }}
+                            >
+                              {revokingId === member.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Field Notes Section */}
@@ -713,6 +928,84 @@ export default function CaseManagement({ onCaseSelect }: CaseManagementProps) {
         </div>
 
       </div>
+
+      {/* ── Invite Officer Modal ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showInviteModal && selectedCase && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowInviteModal(false); setOfficerSearch(''); setOfficerResults([]); } }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 20, opacity: 0 }}
+              className="bg-card border border-blue-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-lg font-black font-mono uppercase tracking-[0.15em] text-primary">Invite Officer</h2>
+                  <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mt-0.5">
+                    Joint Operation: {selectedCase.title}
+                  </p>
+                </div>
+                <button onClick={() => { setShowInviteModal(false); setOfficerSearch(''); setOfficerResults([]); }} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Search box */}
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by Officer ID (e.g. OFF111)"
+                  value={officerSearch}
+                  onChange={(e) => handleOfficerSearch(e.target.value)}
+                  className="pl-9 font-mono text-xs uppercase tracking-wider bg-black/20 border-border/50"
+                  autoFocus
+                />
+                {searchingOfficer && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />
+                )}
+              </div>
+
+              {/* Results */}
+              <div className="space-y-2 min-h-[80px]">
+                {officerResults.length === 0 && officerSearch.length >= 2 && !searchingOfficer && (
+                  <p className="text-[10px] font-mono text-muted-foreground text-center py-6 opacity-60 uppercase tracking-widest">No officers found</p>
+                )}
+                {officerResults.length === 0 && officerSearch.length < 2 && (
+                  <p className="text-[10px] font-mono text-muted-foreground text-center py-6 opacity-40 uppercase tracking-widest">Type an officer ID to search</p>
+                )}
+                {officerResults.map((officer) => (
+                  <div key={officer.id} className="flex items-center justify-between bg-black/30 rounded-xl px-4 py-3 border border-border/40 hover:border-blue-500/30 transition-all">
+                    <div>
+                      <p className="text-sm font-mono font-bold text-primary uppercase">{officer.user_id}</p>
+                      <p className="text-[10px] text-muted-foreground">{officer.email}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={sendingInvite}
+                      onClick={() => handleSendInvite(officer.user_id)}
+                      className="font-mono text-[10px] uppercase tracking-widest h-7 bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30"
+                    >
+                      {sendingInvite ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5 mr-1" />}
+                      Invite
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-[9px] font-mono text-muted-foreground/50 mt-4 text-center uppercase tracking-widest">
+                The officer will see a notification on their dashboard to accept or decline.
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

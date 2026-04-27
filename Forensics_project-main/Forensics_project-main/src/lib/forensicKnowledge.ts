@@ -59,6 +59,10 @@ export const FORENSIC_KNOWLEDGE = [
     keywords: ["root", "jailbreak", "unlocked", "system"],
     response: "A rooted or jailbroken device allows deeper access but may trigger security wipes. Document the device state immediately to prevent 'Remote Wipe' commands from the suspect."
   },
+  {
+    keywords: ["iphone", "locked", "passcode", "password", "pin", "handle"],
+    response: "If an iPhone or modern Android is locked, place it in a Faraday bag immediately to prevent remote wiping. Use AFU (After First Unlock) extraction methods if the device was recently unlocked, or submit it to a forensic lab for BFU (Before First Unlock) brute-forcing. Do NOT attempt to guess the PIN multiple times, as this may trigger a secure wipe."
+  },
 
   // --- BEHAVIORAL & INVESTIGATIVE ---
   {

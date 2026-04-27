@@ -509,6 +509,21 @@ State your query in plain language — I will decipher it.`;
   // ── System Actions (CHANAKYA UI Control) ───────────────────────────────────
   // Handled earlier to allow execution without case data.
 
+  // ── Procedural / Knowledge Base Intercept (Highest Priority) ───────────────
+  if (
+    bestIntent?.id === "PROCEDURAL" ||
+    /\b(how|what is|procedure|admissible|law|section|act|bns|handle|seize|extract|locked|iphone|password|pin)\b/.test(
+      q
+    )
+  ) {
+    const matchingScenario = FORENSIC_KNOWLEDGE.find((s) =>
+      s.keywords.some((k) => q.includes(k.toLowerCase()))
+    );
+    if (matchingScenario) {
+      return `**[Forensic Knowledge Entry]**\n\n${matchingScenario.response}`;
+    }
+  }
+
   // ── Case Summary ───────────────────────────────────────────────────────────
   if (bestIntent?.id === "SUMMARY") {
     const suspKeywords = [

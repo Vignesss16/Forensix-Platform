@@ -386,20 +386,14 @@ export function queryFallback(
   if (bestIntent?.id === "GO_CASES") return `[ACTION:GO_CASES]\n\nRouting you to the central dossier management hub.`;
   if (bestIntent?.id === "GO_UPLOAD") return `[ACTION:GO_UPLOAD]\n\nRouting you to the evidence ingestion terminal. You may upload your UFDR files there.`;
 
-  // ── Forensic Knowledge Base Lookup ─────────────────────────────────────────
-  const matchingScenario = FORENSIC_KNOWLEDGE.find(s => 
-    s.keywords.some(k => q.includes(k.toLowerCase()))
-  );
-
-  if (matchingScenario) {
-    let resp = `**[Forensic Knowledge Entry]**\n\n${matchingScenario.response}`;
-    if (!data) {
-      resp += `\n\n💡 *Note: I can also apply this knowledge directly to your evidence once you upload a case file.*`;
-    }
-    return resp;
-  }
-
   if (!data || !data.chats) {
+    // If no data, we can still provide Forensic Knowledge
+    const matchingScenario = FORENSIC_KNOWLEDGE.find(s => 
+      s.keywords.some(k => q.includes(k.toLowerCase()))
+    );
+    if (matchingScenario) {
+      return `**[Forensic Knowledge Entry]**\n\n${matchingScenario.response}\n\n💡 *Note: I can also apply this knowledge directly to your evidence once you upload a case file.*`;
+    }
     return "I am unable to answer that because **no forensic evidence has been linked to this case yet.**\n\nPlease go to the **Upload** tab and parse a UFDR file first, so I have data to analyse.";
   }
 
@@ -1071,6 +1065,14 @@ State your query in plain language — I will decipher it.`;
       }
       return resp;
     }
+  }
+
+  // ── Forensic Knowledge Base Lookup (Data Available) ──────────────────────
+  const matchingScenario = FORENSIC_KNOWLEDGE.find(s => 
+    s.keywords.some(k => q.includes(k.toLowerCase()))
+  );
+  if (matchingScenario) {
+    return `**[Forensic Knowledge Entry]**\n\n${matchingScenario.response}`;
   }
 
   // ── Eliza-style Pronoun Reflection (Natural Conversation) ───────────────────

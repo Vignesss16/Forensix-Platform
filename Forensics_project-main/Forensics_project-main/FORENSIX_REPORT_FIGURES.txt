@@ -1,0 +1,31 @@
+CHANAKYA FORENSIC INTELLIGENCE PLATFORM - PROJECT REPORT FIGURES
+
+FIGURE 1: MISSION DASHBOARD
+Description: Real-time overview of high-priority cases, threat levels, and active forensic operations across the intelligence network.
+
+FIGURE 2: EVIDENCE INGESTION TERMINAL
+Description: Tactical interface for parsing UFDR forensic report files and bulk ingestion of investigative media folders.
+
+FIGURE 3: INTELLIGENCE HUB (DOSSIER MANAGEMENT)
+Description: Centralized system for managing multiple parallel investigations and maintaining secure digital case files.
+
+FIGURE 4: CHANAKYA AI FORENSIC ASSISTANT
+Description: Real-time interactive intelligence engine providing deep-dive analysis of chat logs, call records, and financial trails.
+
+FIGURE 5: TACTICAL INVESTIGATION ROADMAP
+Description: AI-generated 4-phase strategic mission board with interactive objectives for field officers to track progress.
+
+FIGURE 6: MEDIA FORENSICS & ANALYSIS
+Description: Advanced visual evidence gallery with automated extraction of EXIF metadata, timestamps, and camera profiles.
+
+FIGURE 7: NETWORK LINK ANALYSIS (GRAPH)
+Description: Interactive relationship mapping tool that visualizes connections between suspects, organizations, and communication nodes.
+
+FIGURE 8: GEOSPATIAL INTELLIGENCE MAPPING
+Description: Integrated mapping module plotting coordinate data from media files to reconstruct suspect movements and meeting points.
+
+FIGURE 9: CHRONOLOGICAL EVIDENCE TIMELINE
+Description: Reconstructed sequence of forensic events derived from fragmented digital footprints across multiple platforms.
+
+FIGURE 10: AUTOMATED FORENSIC BRIEFING
+Description: Professional investigative report summarizing key findings, suspect profiles, and recommended legal actions.

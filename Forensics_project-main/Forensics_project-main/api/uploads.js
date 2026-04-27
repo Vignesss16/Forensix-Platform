@@ -61,9 +61,20 @@ export default async function handler(req, res) {
     }
   }
 
-  // GET /api/uploads — list all (optionally filtered by caseId)
+  // GET /api/uploads — list all (filtered by authorized cases)
   if (req.method === 'GET' && !id) {
     try {
+      let accessibleCaseIds = [];
+      if (user.role !== 'admin') {
+        const { data: memberships } = await supabase
+          .from('case_members')
+          .select('case_id')
+          .eq('officer_id', user.userId)
+          .eq('status', 'accepted');
+        accessibleCaseIds = memberships ? memberships.map(m => m.case_id) : [];
+        if (accessibleCaseIds.length === 0) return res.json([]);
+      }
+
       // ONLY select metadata, do NOT select ufdr_data here or Vercel will crash!
       let query = supabase
         .from('uploads')
@@ -73,10 +84,12 @@ export default async function handler(req, res) {
       if (req.query.caseId) {
         query = query.eq('case_id', req.query.caseId);
       }
+      
+      if (user.role !== 'admin') {
+        query = query.in('case_id', accessibleCaseIds);
+      }
 
       const { data, error } = await query;
-
-
       if (error) throw error;
       return res.json(data);
     } catch (err) {
@@ -94,6 +107,19 @@ export default async function handler(req, res) {
         .single();
 
       if (error || !data) return res.status(404).json({ error: 'Upload not found' });
+
+      // Verify access to this upload's case
+      if (user.role !== 'admin' && data.case_id) {
+        const { data: ownership } = await supabase
+          .from('case_members')
+          .select('id')
+          .eq('case_id', data.case_id)
+          .eq('officer_id', user.userId)
+          .eq('status', 'accepted')
+          .single();
+        if (!ownership) return res.status(403).json({ error: 'Access denied to this file' });
+      }
+
       return res.json(data);
     } catch (err) {
       return res.status(500).json({ error: err.message });

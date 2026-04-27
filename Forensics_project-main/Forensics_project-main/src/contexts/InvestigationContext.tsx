@@ -78,6 +78,12 @@ export function InvestigationProvider({ children }: { children: ReactNode }) {
       const currentCase = caseList.find((c: any) => (c.id || c._id) === caseId);
       if (currentCase) {
         setActiveCase({ ...currentCase, id: currentCase.id || currentCase._id });
+      } else {
+        // Security fix: If the case isn't in the accessible list, we must clear context!
+        setActiveCaseId(null);
+        setDataState(null);
+        setIsLoadingCaseData(false);
+        return;
       }
 
       if (uploads && uploads.length > 0) {

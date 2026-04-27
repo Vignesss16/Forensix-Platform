@@ -690,7 +690,8 @@ State your query in plain language — I will decipher it.`;
 
   // ── Communication Patterns ─────────────────────────────────────────────────
   if (
-    /\b(pattern|communication|network|relationship|who talks|frequent|most messages|active|top|central)\b/.test(
+    bestIntent?.id === "NETWORK_ANALYSIS" ||
+    /\b(pattern|communication|network|relationship|who talks|frequent|most|talking to|active|top|central)\b/.test(
       q
     )
   ) {
@@ -751,6 +752,7 @@ State your query in plain language — I will decipher it.`;
 
   // ── Timeline / Chronology ──────────────────────────────────────────────────
   if (
+    bestIntent?.id === "TIMELINE" ||
     /\b(timeline|chronolog|sequence|when|history|order|earliest|latest|first|last|over time)\b/.test(
       q
     )
@@ -811,6 +813,7 @@ State your query in plain language — I will decipher it.`;
 
   // ── Location / GPS ─────────────────────────────────────────────────────────
   if (
+    bestIntent?.id === "LOCATION" ||
     /\b(location|gps|geo|coordinate|where|map|place|lat|lng|latitude|longitude|geography)\b/.test(
       q
     )
